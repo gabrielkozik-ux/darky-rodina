@@ -158,8 +158,29 @@ function renderGift(gift) {
                 statusHTML += `<button data-id="${gift.id}" class="join-group-btn px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600">Přidat se</button>`;
             }
             break;
+        // PŮVODNÍ KÓD:
+/*
         case 'claimed-solo':
         case 'claimed-group':
+            statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno</p>`;
+            break;
+*/
+
+// NOVÝ KÓD:
+        case 'claimed-solo':
+            if (isSoloClaimer) {
+                // Pokud jsem to já, kdo dárek rezervoval, zobrazím tlačítko pro zrušení.
+                statusHTML = `
+                    <p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno vámi</p>
+                    <button data-id="${gift.id}" class="cancel-solo-claim-btn px-3 py-1 bg-red-500 text-white text-sm rounded-md hover:bg-red-600">Zrušit rezervaci</button>
+                `;
+            } else {
+                // Pro ostatní se nic nemění, vidí jen "Zarezervováno".
+                statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno</p>`;
+            }
+            break;
+
+        case 'claimed-group': // Pro skupinové dárky zatím necháme původní chování
             statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno</p>`;
             break;
     }
