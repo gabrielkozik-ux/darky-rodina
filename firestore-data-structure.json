@@ -1,0 +1,55 @@
+{
+  "users": {
+    "someUserIdFromAuth_1": {
+      "email": "babicka@email.com",
+      "displayName": "Jana Nováková",
+      "role": "approved"
+    },
+    "someUserIdFromAuth_2": {
+      "email": "deda@email.com",
+      "displayName": "Pavel Novák",
+      "role": "pending"
+    },
+    "yourAdminUserId": {
+        "email": "gabriel.kozik@gmail.com",
+        "displayName": "Gabriel Kozik",
+        "role": "admin"
+    }
+  },
+  "gifts": {
+    "giftId_1_Lego": {
+      "name": "Stavebnice LEGO City",
+      "occasion": "Vánoce 2025",
+      "description": "Policejní stanice pro Kubíka.",
+      "link": "https://www.alza.cz/...",
+      "status": "claimed-solo",
+      "claimedBySolo": "someUserIdFromAuth_1",
+      "contributors": [],
+      "coordinator": null
+    },
+    "giftId_2_Medved": {
+      "name": "Velký plyšový medvěd",
+      "occasion": "Narozeniny",
+      "description": "Pro Aničku, ten co se jí líbil v obchodě.",
+      "link": null,
+      "status": "group-open",
+      "claimedBySolo": null,
+      "contributors": ["someUserIdFromAuth_1", "someUserIdFromAuth_2"],
+      "coordinator": "someUserIdFromAuth_1",
+      "chat": {
+        "messageId_1": {
+            "user": "Jana Nováková",
+            "uid": "someUserIdFromAuth_1",
+            "message": "Ahoj, chci se na medvěda složit. Kdo se přidá?",
+            "timestamp": "2025-10-19T20:15:00Z"
+        },
+        "messageId_2": {
+            "user": "Pavel Novák",
+            "uid": "someUserIdFromAuth_2",
+            "message": "Super nápad, jdu do toho taky.",
+            "timestamp": "2025-10-19T20:20:00Z"
+        }
+      }
+    }
+  }
+}
