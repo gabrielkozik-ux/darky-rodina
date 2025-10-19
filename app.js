@@ -2,12 +2,12 @@
 // Tento objekt získáš v nastavení svého projektu ve Firebase konzoli.
 // Project Settings -> General -> Your apps -> SDK setup and configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyYOUR_API_KEY_HERE",
-    authDomain: "your-project-id.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project-id.appspot.com",
-    messagingSenderId: "your-sender-id",
-    appId: "your-app-id"
+  apiKey: "AIzaSyC5qWRgRWW9q5G8NRmOpCln1Wwb03Z2eXs",
+  authDomain: "darky-rodina.firebaseapp.com",
+  projectId: "darky-rodina",
+  storageBucket: "darky-rodina.firebasestorage.app",
+  messagingSenderId: "1070152594421",
+  appId: "1:1070152594421:web:5e686e340e756025d726bc"
 };
 
 // --- Inicializace Firebase ------------------------------------------------
