@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="cs" class="bg-slate-50">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Tento tag zabrání vyhledávačům stránku indexovat -->
+    <meta name="robots" content="noindex, nofollow">
+    <title>Rodinná přání</title>
+    <!-- Použijeme Tailwind CSS pro moderní vzhled bez psaní vlastního CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Jednoduchá animace pro načítání */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loader {
+            border: 4px solid rgba(0, 0, 0, .1);
+            border-left-color: #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+
+<body class="font-sans text-slate-800">
+
+    <div class="container mx-auto max-w-4xl p-4 md:p-8">
+
+        <!-- Hlavička s přihlašováním -->
+        <header class="flex justify-between items-center mb-8 pb-4 border-b border-slate-200">
+            <h1 class="text-3xl font-bold text-slate-900">Seznam přání</h1>
+            <div id="auth-container">
+                <button id="loginBtn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Přihlásit se přes Google
+                </button>
+                <div id="user-info" class="hidden items-center gap-4">
+                    <p class="text-sm">Přihlášen/a: <span id="user-name" class="font-semibold"></span></p>
+                    <button id="logoutBtn" class="px-3 py-1 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300">
+                        Odhlásit
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main id="app-content">
+            <!-- Zpráva pro neschválené uživatele -->
+            <div id="pending-approval-msg" class="hidden p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg">
+                <h2 class="font-bold">Děkujeme za registraci!</h2>
+                <p>Váš účet nyní čeká na schválení administrátorem. Jakmile bude účet aktivní, uvidíte zde seznam dárků.</p>
+            </div>
+
+            <!-- Načítání -->
+            <div id="loader" class="hidden justify-center items-center py-16">
+                <div class="loader"></div>
+            </div>
+            
+            <!-- Kontejner pro seznam dárků -->
+            <div id="gifts-container" class="space-y-4">
+                <!-- Dárky se budou generovat sem pomocí JavaScriptu -->
+            </div>
+
+            <!-- Uvítací zpráva pro nepřihlášené -->
+            <div id="welcome-msg" class="p-8 bg-white border border-slate-200 rounded-lg text-center">
+                <h2 class="text-2xl font-bold mb-2">Vítejte!</h2>
+                <p class="text-slate-600">Pro zobrazení seznamu dárků se prosím přihlaste pomocí svého Google účtu.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Firebase SDK - nezbytné pro funkčnost -->
+    <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Vlastní logika aplikace -->
+    <script src="app.js"></script>
+</body>
+
+</html>
