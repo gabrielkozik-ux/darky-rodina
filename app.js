@@ -272,6 +272,12 @@ giftsContainer.addEventListener('click', async (e) => {
             contributors: arrayUnion(currentUser.uid)
         });
     }
+    if (btn.matches('.cancel-solo-claim-btn')) {
+        await updateDoc(giftRef, {
+            status: 'available',
+            claimedBySolo: null // Použij null pro vymazání pole
+        });
+    }
 });
 
 // Odesílání zpráv v chatu
