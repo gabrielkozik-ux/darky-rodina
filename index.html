@@ -70,31 +70,7 @@
         </main>
     </div>
 
-    <!-- Firebase SDK - nezbytné pro funkčnost -->
-    <script type="module">
-    // Importuj funkce, které potřebuješ, přímo z SDK
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc, arrayUnion, serverTimestamp, addDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js";
-
-    // --- Firebase Konfigurace --------------------------------------------------
-    const firebaseConfig = {
-        apiKey: "AIzaSyC5qWRgRWW9q5G8NRmOpCln1Wwb03Z2eXs",
-        authDomain: "darky-rodina.firebaseapp.com",
-        projectId: "darky-rodina",
-        storageBucket: "darky-rodina.firebasestorage.app",
-        messagingSenderId: "1070152594421",
-        appId: "1:1070152594421:web:5e686e340e756025d726bc"
-    };
-
-    // --- Inicializace Firebase a služeb --------------------------------------
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    // --- Tady bude celý zbytek tvého kódu z app.js -------------------------
-    // (viz krok 2 níže)
-</script>
+   <script type="module" src="app.js"></script>
 </body>
 
 </html>
