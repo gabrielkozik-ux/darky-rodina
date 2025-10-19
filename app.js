@@ -1,6 +1,12 @@
 // --- Firebase Konfigurace --------------------------------------------------
 // Tento objekt získáš v nastavení svého projektu ve Firebase konzoli.
 // Project Settings -> General -> Your apps -> SDK setup and configuration
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyC5qWRgRWW9q5G8NRmOpCln1Wwb03Z2eXs",
   authDomain: "darky-rodina.firebaseapp.com",
@@ -9,6 +15,9 @@ const firebaseConfig = {
   messagingSenderId: "1070152594421",
   appId: "1:1070152594421:web:5e686e340e756025d726bc"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
 // --- Inicializace Firebase ------------------------------------------------
 firebase.initializeApp(firebaseConfig);
