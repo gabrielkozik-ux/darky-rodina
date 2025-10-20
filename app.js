@@ -17,13 +17,11 @@ const firebaseConfig = {
 };
 
 // --- Inicializace Firebase a služeb --------------------------------------
-// Inicializujeme aplikaci a získáme reference na služby Auth a Firestore.
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 // --- Reference na HTML Elementy -------------------------------------------
-// Načteme si všechny elementy z HTML, se kterými budeme pracovat.
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const userInfo = document.getElementById('user-info');
@@ -33,7 +31,9 @@ const pendingApprovalMsg = document.getElementById('pending-approval-msg');
 const giftsContainer = document.getElementById('gifts-container');
 const loader = document.getElementById('loader');
 
-let currentUser = null; // Globální proměnná pro přihlášeného uživatele
+// --- Globální proměnné ----------------------------------------------------
+let currentUser = null; // Objekt přihlášeného uživatele
+let isAdmin = false;    // Zda je přihlášený uživatel administrátor
 
 // --- Autentizace ---------------------------------------------------------
 
@@ -63,6 +63,7 @@ onAuthStateChanged(auth, user => {
         checkUserRoleAndLoadGifts(user);
     } else {
         // Uživatel je odhlášen
+        isAdmin = false; // <<< ZMĚNA: Při odhlášení resetujeme admin status
         loginBtn.classList.remove('hidden');
         userInfo.classList.add('hidden');
         userNameEl.textContent = '';
@@ -77,7 +78,8 @@ onAuthStateChanged(auth, user => {
 
 /**
  * Zkontroluje roli uživatele v databázi. Pokud neexistuje, vytvoří ho
- * s rolí 'pending'. Pokud je schválený, načte dárky.
+ * s rolí 'pending'. Podle role nastaví globální proměnnou 'isAdmin'
+ * a případně načte dárky.
  * @param {object} user - Objekt uživatele z Firebase Auth.
  */
 async function checkUserRoleAndLoadGifts(user) {
@@ -90,6 +92,7 @@ async function checkUserRoleAndLoadGifts(user) {
 
     if (!userDoc.exists()) {
         // Uživatel je v systému poprvé, vytvoříme mu profil.
+        isAdmin = false;
         try {
             await setDoc(userRef, {
                 email: user.email,
@@ -104,6 +107,10 @@ async function checkUserRoleAndLoadGifts(user) {
     } else {
         // Uživatel již v databázi existuje, zkontrolujeme jeho roli.
         const userData = userDoc.data();
+        
+        // <<< ZMĚNA: Nastavíme globální proměnnou podle role z databáze
+        isAdmin = userData.role === 'admin';
+
         if (userData.role === 'approved' || userData.role === 'admin') {
             pendingApprovalMsg.classList.add('hidden');
             listenForGifts(); // Uživatel je schválen, načteme dárky.
@@ -122,6 +129,9 @@ function listenForGifts() {
     onSnapshot(giftsQuery, snapshot => {
         loader.classList.add('hidden');
         giftsContainer.innerHTML = ''; // Vyčistíme starý seznam
+        if (snapshot.empty) {
+             giftsContainer.innerHTML = `<p class="text-center text-slate-500">Zatím tu nejsou žádné nápady na dárky.</p>`;
+        }
         snapshot.forEach(doc => {
             const gift = { id: doc.id, ...doc.data() };
             renderGift(gift);
@@ -136,7 +146,9 @@ function listenForGifts() {
  * @param {object} gift - Objekt dárku z Firestore.
  */
 function renderGift(gift) {
+    // <<< OPRAVA: Definujeme obě potřebné proměnné hned na začátku.
     const isContributor = gift.contributors && gift.contributors.includes(currentUser.uid);
+    const isSoloClaimer = gift.claimedBySolo === currentUser.uid;
 
     const card = document.createElement('div');
     card.className = "bg-white p-5 rounded-lg border border-slate-200 shadow-sm";
@@ -158,15 +170,7 @@ function renderGift(gift) {
                 statusHTML += `<button data-id="${gift.id}" class="join-group-btn px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600">Přidat se</button>`;
             }
             break;
-        // PŮVODNÍ KÓD:
-/*
-        case 'claimed-solo':
-        case 'claimed-group':
-            statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno</p>`;
-            break;
-*/
-
-// NOVÝ KÓD:
+        // <<< OPRAVA + VYLEPŠENÍ: Kompletně přepsaná logika pro 'claimed-solo'
         case 'claimed-solo':
             if (isSoloClaimer) {
                 // Pokud jsem to já, kdo dárek rezervoval, zobrazím tlačítko pro zrušení.
@@ -174,14 +178,16 @@ function renderGift(gift) {
                     <p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno vámi</p>
                     <button data-id="${gift.id}" class="cancel-solo-claim-btn px-3 py-1 bg-red-500 text-white text-sm rounded-md hover:bg-red-600">Zrušit rezervaci</button>
                 `;
+            } else if (isAdmin) {
+                // Pokud jsem admin, vidím, že to rezervoval někdo jiný.
+                 statusHTML = `<p class="text-sm text-purple-600 font-semibold mb-3">Rezervoval někdo jiný</p>`;
             } else {
                 // Pro ostatní se nic nemění, vidí jen "Zarezervováno".
                 statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno</p>`;
             }
             break;
-
-        case 'claimed-group': // Pro skupinové dárky zatím necháme původní chování
-            statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno</p>`;
+        case 'claimed-group':
+            statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno (skupina)</p>`;
             break;
     }
 
@@ -208,7 +214,7 @@ function renderGift(gift) {
                 <h3 class="text-lg font-bold">${gift.name}</h3>
                 <p class="text-sm text-slate-500 mb-2">Příležitost: ${gift.occasion}</p>
                 <p class="text-slate-700">${gift.description}</p>
-                ${gift.link ? `<a href="${gift.link}" target="_blank" class="text-indigo-600 hover:underline text-sm break-all">Odkaz na dárek</a>` : ''}
+                ${gift.link ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline text-sm break-all">Odkaz na dárek</a>` : ''}
             </div>
             <div class="text-left sm:text-right flex-shrink-0">
                 ${statusHTML}
