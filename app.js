@@ -1,12 +1,9 @@
 // --- Importy potřebných funkcí z Firebase SDK -----------------------------
-// Načítáme moduly přímo z Firebase CDN, což nám umožňuje moderní přístup
-// bez nutnosti "build" procesů jako Webpack.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc, arrayUnion, serverTimestamp, addDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc, arrayUnion, serverTimestamp, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js";
 
 // --- Firebase Konfigurace --------------------------------------------------
-// Tvoje konfigurační data z Firebase projektu.
 const firebaseConfig = {
     apiKey: "AIzaSyC5qWRgRWW9q5G8NRmOpCln1Wwb03Z2eXs",
     authDomain: "darky-rodina.firebaseapp.com",
@@ -32,29 +29,20 @@ const giftsContainer = document.getElementById('gifts-container');
 const loader = document.getElementById('loader');
 
 // --- Globální proměnné ----------------------------------------------------
-let currentUser = null; // Objekt přihlášeného uživatele
-let isAdmin = false;    // Zda je přihlášený uživatel administrátor
+let currentUser = null;
+let isAdmin = false;
 
 // --- Autentizace ---------------------------------------------------------
-
-// Přihlášení pomocí Google
 loginBtn.addEventListener('click', () => {
     const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider).catch(error => {
-        console.error("Chyba při přihlašování: ", error);
-    });
+    signInWithPopup(auth, provider).catch(error => console.error("Chyba při přihlašování: ", error));
 });
 
-// Odhlášení
-logoutBtn.addEventListener('click', () => {
-    signOut(auth);
-});
+logoutBtn.addEventListener('click', () => signOut(auth));
 
-// Sledování změn stavu přihlášení (uživatel se přihlásí / odhlásí)
 onAuthStateChanged(auth, user => {
     currentUser = user;
     if (user) {
-        // Uživatel je přihlášen
         loginBtn.classList.add('hidden');
         userInfo.classList.remove('hidden');
         userInfo.classList.add('flex');
@@ -62,8 +50,7 @@ onAuthStateChanged(auth, user => {
         welcomeMsg.classList.add('hidden');
         checkUserRoleAndLoadGifts(user);
     } else {
-        // Uživatel je odhlášen
-        isAdmin = false; // <<< ZMĚNA: Při odhlášení resetujeme admin status
+        isAdmin = false;
         loginBtn.classList.remove('hidden');
         userInfo.classList.add('hidden');
         userNameEl.textContent = '';
@@ -75,13 +62,6 @@ onAuthStateChanged(auth, user => {
 });
 
 // --- Logika Aplikace ----------------------------------------------------
-
-/**
- * Zkontroluje roli uživatele v databázi. Pokud neexistuje, vytvoří ho
- * s rolí 'pending'. Podle role nastaví globální proměnnou 'isAdmin'
- * a případně načte dárky.
- * @param {object} user - Objekt uživatele z Firebase Auth.
- */
 async function checkUserRoleAndLoadGifts(user) {
     loader.classList.remove('hidden');
     loader.classList.add('flex');
@@ -91,13 +71,12 @@ async function checkUserRoleAndLoadGifts(user) {
     const userDoc = await getDoc(userRef);
 
     if (!userDoc.exists()) {
-        // Uživatel je v systému poprvé, vytvoříme mu profil.
         isAdmin = false;
         try {
             await setDoc(userRef, {
                 email: user.email,
                 displayName: user.displayName,
-                role: 'pending' // Role: pending, approved, admin
+                role: 'pending'
             });
             pendingApprovalMsg.classList.remove('hidden');
         } catch (error) {
@@ -105,30 +84,23 @@ async function checkUserRoleAndLoadGifts(user) {
         }
         loader.classList.add('hidden');
     } else {
-        // Uživatel již v databázi existuje, zkontrolujeme jeho roli.
         const userData = userDoc.data();
-        
-        // <<< ZMĚNA: Nastavíme globální proměnnou podle role z databáze
         isAdmin = userData.role === 'admin';
-
         if (userData.role === 'approved' || userData.role === 'admin') {
             pendingApprovalMsg.classList.add('hidden');
-            listenForGifts(); // Uživatel je schválen, načteme dárky.
-        } else { // Role je 'pending' nebo jiná neschválená.
+            listenForGifts();
+        } else {
             pendingApprovalMsg.classList.remove('hidden');
             loader.classList.add('hidden');
         }
     }
 }
 
-/**
- * Naslouchá změnám v kolekci 'gifts' v reálném čase a překresluje seznam.
- */
 function listenForGifts() {
     const giftsQuery = query(collection(db, 'gifts'));
     onSnapshot(giftsQuery, snapshot => {
         loader.classList.add('hidden');
-        giftsContainer.innerHTML = ''; // Vyčistíme starý seznam
+        giftsContainer.innerHTML = '';
         if (snapshot.empty) {
              giftsContainer.innerHTML = `<p class="text-center text-slate-500">Zatím tu nejsou žádné nápady na dárky.</p>`;
         }
@@ -136,17 +108,10 @@ function listenForGifts() {
             const gift = { id: doc.id, ...doc.data() };
             renderGift(gift);
         });
-    }, error => {
-        console.error("Chyba při načítání dárků:", error);
-    });
+    }, error => console.error("Chyba při načítání dárků:", error));
 }
 
-/**
- * Vykreslí jednu kartu dárku do HTML.
- * @param {object} gift - Objekt dárku z Firestore.
- */
 function renderGift(gift) {
-    // <<< OPRAVA: Definujeme obě potřebné proměnné hned na začátku.
     const isContributor = gift.contributors && gift.contributors.includes(currentUser.uid);
     const isSoloClaimer = gift.claimedBySolo === currentUser.uid;
 
@@ -154,7 +119,6 @@ function renderGift(gift) {
     card.className = "bg-white p-5 rounded-lg border border-slate-200 shadow-sm";
     
     let statusHTML = '';
-    // Logika pro zobrazení stavu a tlačítek podle statusu dárku
     switch(gift.status) {
         case 'available':
             statusHTML = `
@@ -165,24 +129,20 @@ function renderGift(gift) {
                 </div>`;
             break;
         case 'group-open':
-            statusHTML = `<p class="text-sm text-blue-600 font-semibold mb-3">Skládá se skupina (${gift.contributors.length})</p>`;
+            statusHTML = `<p class="text-sm text-blue-600 font-semibold mb-3">Skládá se skupina (${gift.contributors?.length || 0})</p>`;
             if (!isContributor) {
                 statusHTML += `<button data-id="${gift.id}" class="join-group-btn px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600">Přidat se</button>`;
             }
             break;
-        // <<< OPRAVA + VYLEPŠENÍ: Kompletně přepsaná logika pro 'claimed-solo'
         case 'claimed-solo':
             if (isSoloClaimer) {
-                // Pokud jsem to já, kdo dárek rezervoval, zobrazím tlačítko pro zrušení.
                 statusHTML = `
                     <p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno vámi</p>
                     <button data-id="${gift.id}" class="cancel-solo-claim-btn px-3 py-1 bg-red-500 text-white text-sm rounded-md hover:bg-red-600">Zrušit rezervaci</button>
                 `;
             } else if (isAdmin) {
-                // Pokud jsem admin, vidím, že to rezervoval někdo jiný.
                  statusHTML = `<p class="text-sm text-purple-600 font-semibold mb-3">Rezervoval někdo jiný</p>`;
             } else {
-                // Pro ostatní se nic nemění, vidí jen "Zarezervováno".
                 statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno</p>`;
             }
             break;
@@ -191,7 +151,6 @@ function renderGift(gift) {
             break;
     }
 
-    // Zobrazení chatu pouze pro členy skupiny
     let chatHTML = '';
     if (isContributor) {
         chatHTML = `
@@ -204,7 +163,6 @@ function renderGift(gift) {
                 </form>
             </div>
         `;
-        // Asynchronně načteme zprávy pro tento chat
         listenForChatMessages(gift.id);
     }
 
@@ -212,9 +170,10 @@ function renderGift(gift) {
         <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div class="flex-grow">
                 <h3 class="text-lg font-bold">${gift.name}</h3>
+                ${gift.recipient ? `<p class="text-sm font-medium text-slate-600">Pro: ${gift.recipient}</p>` : ''}
                 <p class="text-sm text-slate-500 mb-2">Příležitost: ${gift.occasion}</p>
                 <p class="text-slate-700">${gift.description}</p>
-                ${gift.link ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline text-sm break-all">Odkaz na dárek</a>` : ''}
+                ${gift.link ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Přejít na web dárku</a>` : ''}
             </div>
             <div class="text-left sm:text-right flex-shrink-0">
                 ${statusHTML}
@@ -222,14 +181,9 @@ function renderGift(gift) {
         </div>
         ${chatHTML}
     `;
-    
     giftsContainer.appendChild(card);
 }
 
-/**
- * Naslouchá zprávám v chatu konkrétního dárku.
- * @param {string} giftId - ID dárku.
- */
 function listenForChatMessages(giftId) {
     const chatQuery = query(collection(db, 'gifts', giftId, 'chat'), orderBy('timestamp'));
     onSnapshot(chatQuery, snapshot => {
@@ -239,70 +193,108 @@ function listenForChatMessages(giftId) {
         snapshot.forEach(doc => {
             const msg = doc.data();
             const msgEl = document.createElement('div');
-            // Zvýraznění vlastních zpráv
-            const sender = msg.uid === currentUser.uid ? 'Vy' : msg.user;
-            const fontWeight = msg.uid === currentUser.uid ? 'font-bold' : 'font-semibold';
-            msgEl.innerHTML = `<p><strong class="${fontWeight}">${sender}:</strong> ${msg.message}</p>`;
+            msgEl.className = 'chat-message flex items-start justify-between gap-2';
+            msgEl.dataset.msgId = doc.id; // Uložíme ID zprávy pro pozdější použití
+
+            const isMyMessage = msg.uid === currentUser.uid;
+            const sender = isMyMessage ? 'Vy' : msg.user;
+            const fontWeight = isMyMessage ? 'font-bold' : 'font-semibold';
+
+            let actionsHTML = '';
+            if (isMyMessage) {
+                actionsHTML = `
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button class="edit-comment-btn text-xs text-slate-500 hover:text-indigo-600" title="Upravit">✏️</button>
+                        <button class="delete-comment-btn text-xs text-slate-500 hover:text-red-600" title="Smazat">🗑️</button>
+                    </div>
+                `;
+            }
+
+            msgEl.innerHTML = `
+                <div class="message-content">
+                    <p><strong class="${fontWeight}">${sender}:</strong> <span class="message-text">${msg.message}</span></p>
+                </div>
+                ${actionsHTML}
+            `;
             chatContainer.appendChild(msgEl);
         });
-        // Automaticky odscrollovat na poslední zprávu
         chatContainer.scrollTop = chatContainer.scrollHeight;
     });
 }
 
-// --- Event Listeners pro akce s dárky ---------------------------------------
+// --- Event Listeners pro akce ---
 giftsContainer.addEventListener('click', async (e) => {
-    const btn = e.target;
-    const giftId = btn.dataset.id;
-    if (!giftId || !currentUser) return;
+    const btn = e.target.closest('button'); // Zajistí, že chytneme i klik na ikonu v tlačítku
+    if (!btn || !currentUser) return;
 
-    const giftRef = doc(db, 'gifts', giftId);
+    const giftId = btn.dataset.id || btn.closest('[data-id]')?.dataset.id || btn.closest('.chat-message')?.closest('[id^="chat-"]')?.id.replace('chat-', '');
+    const giftRef = giftId ? doc(db, 'gifts', giftId) : null;
 
-    if (btn.matches('.claim-solo-btn')) {
-        await updateDoc(giftRef, {
-            status: 'claimed-solo',
-            claimedBySolo: currentUser.uid,
-            contributors: [],
-            coordinator: null
-        });
+    // Akce s dárky
+    if (btn.matches('.claim-solo-btn')) await updateDoc(giftRef, { status: 'claimed-solo', claimedBySolo: currentUser.uid, contributors: [], coordinator: null });
+    if (btn.matches('.create-group-btn')) await updateDoc(giftRef, { status: 'group-open', contributors: arrayUnion(currentUser.uid), coordinator: currentUser.uid });
+    if (btn.matches('.join-group-btn')) await updateDoc(giftRef, { contributors: arrayUnion(currentUser.uid) });
+    if (btn.matches('.cancel-solo-claim-btn')) await updateDoc(giftRef, { status: 'available', claimedBySolo: null });
+
+    // Akce s komentáři
+    const msgId = btn.closest('.chat-message')?.dataset.msgId;
+
+    if (btn.matches('.delete-comment-btn') && confirm('Opravdu smazat komentář?')) {
+        const msgRef = doc(db, 'gifts', giftId, 'chat', msgId);
+        await deleteDoc(msgRef);
     }
-    if (btn.matches('.create-group-btn')) {
-        await updateDoc(giftRef, {
-            status: 'group-open',
-            contributors: arrayUnion(currentUser.uid),
-            coordinator: currentUser.uid
-        });
+    
+    if (btn.matches('.edit-comment-btn')) {
+        const msgEl = btn.closest('.chat-message');
+        const contentEl = msgEl.querySelector('.message-content');
+        const originalText = contentEl.querySelector('.message-text').textContent;
+        contentEl.style.display = 'none'; // Skryjeme původní text
+        btn.parentElement.style.display = 'none'; // Skryjeme tlačítka
+
+        const editForm = document.createElement('form');
+        editForm.className = 'edit-comment-form flex-grow flex gap-2';
+        editForm.innerHTML = `
+            <input type="text" value="${originalText}" class="flex-grow border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
+            <button type="submit" class="px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600">Uložit</button>
+            <button type="button" class="cancel-edit-btn px-2 py-1 bg-slate-200 text-slate-700 text-xs rounded-md hover:bg-slate-300">Zrušit</button>
+        `;
+        msgEl.appendChild(editForm);
     }
-    if (btn.matches('.join-group-btn')) {
-        await updateDoc(giftRef, {
-            contributors: arrayUnion(currentUser.uid)
-        });
-    }
-    if (btn.matches('.cancel-solo-claim-btn')) {
-        await updateDoc(giftRef, {
-            status: 'available',
-            claimedBySolo: null // Použij null pro vymazání pole
-        });
+
+    if (btn.matches('.cancel-edit-btn')) {
+        const msgEl = btn.closest('.chat-message');
+        msgEl.querySelector('.edit-comment-form').remove();
+        msgEl.querySelector('.message-content').style.display = 'block';
+        msgEl.querySelector('.flex-shrink-0').style.display = 'flex';
     }
 });
 
-// Odesílání zpráv v chatu
 giftsContainer.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!e.target.matches('.chat-form')) return;
-
-    const giftId = e.target.querySelector('button').dataset.id;
-    const input = e.target.querySelector('input');
-    const message = input.value.trim();
-
-    if (message && giftId && currentUser) {
-        const chatCollectionRef = collection(db, 'gifts', giftId, 'chat');
-        await addDoc(chatCollectionRef, {
-            user: currentUser.displayName,
-            uid: currentUser.uid,
-            message: message,
-            timestamp: serverTimestamp()
-        });
-        input.value = ''; // Vyčistit pole po odeslání
+    if (!currentUser) return;
+    
+    // Odeslání nové zprávy
+    if (e.target.matches('.chat-form')) {
+        const giftId = e.target.querySelector('button').dataset.id;
+        const input = e.target.querySelector('input');
+        const message = input.value.trim();
+        if (message && giftId) {
+            const chatCollectionRef = collection(db, 'gifts', giftId, 'chat');
+            await addDoc(chatCollectionRef, { user: currentUser.displayName, uid: currentUser.uid, message: message, timestamp: serverTimestamp() });
+            input.value = '';
+        }
+    }
+    
+    // Uložení upravené zprávy
+    if (e.target.matches('.edit-comment-form')) {
+        const giftId = e.target.closest('[id^="chat-"]').id.replace('chat-', '');
+        const msgId = e.target.closest('.chat-message').dataset.msgId;
+        const input = e.target.querySelector('input');
+        const newMessage = input.value.trim();
+        if (newMessage && giftId && msgId) {
+            const msgRef = doc(db, 'gifts', giftId, 'chat', msgId);
+            await updateDoc(msgRef, { message: newMessage });
+            // onSnapshot se postará o překreslení, takže není třeba nic dalšího
+        }
     }
 });
