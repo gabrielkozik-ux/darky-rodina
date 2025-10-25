@@ -140,8 +140,7 @@ async function checkUserRoleAndLoadGifts(user) {
 }
 
 function listenForGifts() {
-    const giftsQuery = query(collection(db, 'gifts'), orderBy('recipient'), orderBy('name'));
-    onSnapshot(giftsQuery, snapshot => {
+const giftsQuery = query(collection(db, 'gifts'));    onSnapshot(giftsQuery, snapshot => {
         loader.classList.add('hidden');
         
         allGifts = [];
