@@ -40,6 +40,11 @@ const giftsOtherContainer = document.getElementById('gifts-other-container');
 const filterContainer = document.getElementById('filter-container');
 const occasionFilter = document.getElementById('occasion-filter');
 
+// *** NOVÉ REFERENCE PRO ZPRÁVY ***
+const filterNoResultsMsg = document.getElementById('filter-no-results-msg');
+const giftsEmptyDbMsg = document.getElementById('gifts-empty-db-msg');
+
+
 // --- Globální proměnné ----------------------------------------------------
 let currentUser = null;
 let isAdmin = false;
@@ -79,6 +84,10 @@ onAuthStateChanged(auth, user => {
         giftsHanickaSection.classList.add('hidden');
         giftsOliverSection.classList.add('hidden');
         giftsOtherSection.classList.add('hidden');
+        
+        // Skrýt zprávy
+        filterNoResultsMsg.classList.add('hidden');
+        giftsEmptyDbMsg.classList.add('hidden');
     }
 });
 
@@ -109,6 +118,8 @@ async function checkUserRoleAndLoadGifts(user) {
     giftsHanickaSection.classList.add('hidden');
     giftsOliverSection.classList.add('hidden');
     giftsOtherSection.classList.add('hidden');
+    filterNoResultsMsg.classList.add('hidden');
+    giftsEmptyDbMsg.classList.add('hidden');
     
     const userRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userRef);
@@ -140,7 +151,10 @@ async function checkUserRoleAndLoadGifts(user) {
 }
 
 function listenForGifts() {
-const giftsQuery = query(collection(db, 'gifts'));    onSnapshot(giftsQuery, snapshot => {
+    const giftsQuery = query(collection(db, 'gifts'), orderBy('recipient'), orderBy('name'));
+    
+    // Přidáno chybové hlášení, aby se loader schoval i při chybě
+    onSnapshot(giftsQuery, snapshot => {
         loader.classList.add('hidden');
         
         allGifts = [];
@@ -150,7 +164,9 @@ const giftsQuery = query(collection(db, 'gifts'));    onSnapshot(giftsQuery, sna
         
         if (allGifts.length === 0) {
             // Databáze je úplně prázdná
-            giftsWrapper.innerHTML = `<p class="text-center text-slate-500">Zatím tu nejsou žádné nápady na dárky.</p>`;
+            // *** UPRAVENO ***
+            giftsEmptyDbMsg.classList.remove('hidden'); // Zobrazíme zprávu
+            filterNoResultsMsg.classList.add('hidden'); // Skryjeme druhou zprávu
             giftsHanickaSection.classList.add('hidden');
             giftsOliverSection.classList.add('hidden');
             giftsOtherSection.classList.add('hidden');
@@ -159,14 +175,19 @@ const giftsQuery = query(collection(db, 'gifts'));    onSnapshot(giftsQuery, sna
         }
 
         // Databáze není prázdná
-        const existingMsg = giftsWrapper.querySelector('p');
-        if (existingMsg) existingMsg.remove(); // Odstraníme "žádné dárky" zprávu
+        // *** UPRAVENO ***
+        giftsEmptyDbMsg.classList.add('hidden'); // Skryjeme zprávu o prázdné DB
 
         filterContainer.classList.remove('hidden'); // Zobrazíme filtr
         populateOccasionFilter();
         renderFilteredGifts();
 
-    }, error => console.error("Chyba při načítání dárků:", error));
+    }, error => {
+        console.error("Chyba při načítání dárků:", error);
+        loader.classList.add('hidden'); // <-- SCHOVEJ LOADER
+        // A zobraz uživateli chybovou hlášku
+        giftsWrapper.innerHTML = `<p class="text-center text-red-600 font-semibold p-4">Došlo k chybě při načítání databáze. Zkontrolujte konzoli (F12).</p>`;
+    });
 }
 
 /**
@@ -174,18 +195,33 @@ const giftsQuery = query(collection(db, 'gifts'));    onSnapshot(giftsQuery, sna
  */
 function populateOccasionFilter() {
     const defaultOptions = ['all', 'Narozeniny', 'Vánoce', 'Svátek'];
+    
+    // Získáme aktuálně vybranou hodnotu, abychom ji mohli po přeplnění zachovat
+    const currentSelectedValue = occasionFilter.value;
+    
     const existingOptions = Array.from(occasionFilter.options).map(o => o.value);
     
     const occasions = new Set(allGifts.map(g => g.occasion).filter(Boolean));
     
+    // Nejprve smažeme staré dynamicky přidané options (necháme jen ty defaultní)
+    Array.from(occasionFilter.options).forEach(option => {
+        if (!defaultOptions.includes(option.value)) {
+            option.remove();
+        }
+    });
+
+    // Nyní přidáme všechny unikátní z databáze, které ještě neexistují
     occasions.forEach(occasion => {
-        if (!existingOptions.includes(occasion)) {
+        if (!defaultOptions.includes(occasion) && !existingOptions.includes(occasion)) {
             const option = document.createElement('option');
             option.value = occasion;
             option.textContent = occasion;
             occasionFilter.appendChild(option);
         }
     });
+    
+    // Vrátíme původně vybranou hodnotu
+    occasionFilter.value = currentSelectedValue;
 }
 
 /**
@@ -207,16 +243,16 @@ function renderFilteredGifts() {
          giftsHanickaSection.classList.add('hidden');
          giftsOliverSection.classList.add('hidden');
          giftsOtherSection.classList.add('hidden');
-         // Zobrazíme zprávu o prázdném filtru, ale jen pokud už tam není zpráva "žádné dárky"
-         if (!giftsWrapper.querySelector('p')) {
-            giftsWrapper.innerHTML = `<p class="text-center text-slate-500">Žádné dárky neodpovídají zvolenému filtru.</p>`;
-         }
+         
+         // *** UPRAVENO ***
+         // Místo mazání wrapperu jen zobrazíme zprávu
+         filterNoResultsMsg.classList.remove('hidden');
          return;
     }
     
-    // Odstraníme zprávu o prázdném filtru, pokud tam je
-    const existingMsg = giftsWrapper.querySelector('p');
-    if (existingMsg) existingMsg.remove();
+    // *** UPRAVENO ***
+    // Skryjeme zprávu o prázdném filtru, protože máme výsledky
+    filterNoResultsMsg.classList.add('hidden');
 
     const gifts = { hanicka: [], oliver: [], other: [] };
 
