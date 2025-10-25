@@ -4,10 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Tento tag zabrání vyhledávačům stránku indexovat -->
     <meta name="robots" content="noindex, nofollow">
     <title>Rodinná přání</title>
-    <!-- Použijeme Tailwind CSS pro moderní vzhled bez psaní vlastního CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Jednoduchá animace pro načítání */
@@ -29,7 +27,6 @@
 
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
 
-        <!-- Hlavička s přihlašováním -->
         <header class="flex justify-between items-center mb-8 pb-4 border-b border-slate-200">
             <h1 class="text-3xl font-bold text-slate-900">Seznam přání</h1>
             <div id="auth-container">
@@ -46,23 +43,42 @@
         </header>
 
         <main id="app-content">
-            <!-- Zpráva pro neschválené uživatele -->
             <div id="pending-approval-msg" class="hidden p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg">
                 <h2 class="font-bold">Děkujeme za registraci!</h2>
                 <p>Váš účet nyní čeká na schválení administrátorem. Jakmile bude účet aktivní, uvidíte zde seznam dárků.</p>
             </div>
 
-            <!-- Načítání -->
+            <div id="filter-container" class="mb-6 hidden">
+                <label for="occasion-filter" class="block text-sm font-medium text-slate-700 mb-1">Filtrovat podle příležitosti:</label>
+                <select id="occasion-filter" class="w-full max-w-xs rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="all">Všechny příležitosti</option>
+                    <option value="Narozeniny">Narozeniny</option>
+                    <option value="Vánoce">Vánoce</option>
+                    <option value="Svátek">Svátek</option>
+                    </select>
+            </div>
+
             <div id="loader" class="hidden justify-center items-center py-16">
                 <div class="loader"></div>
             </div>
             
-            <!-- Kontejner pro seznam dárků -->
-            <div id="gifts-container" class="space-y-4">
-                <!-- Dárky se budou generovat sem pomocí JavaScriptu -->
+            <div id="gifts-wrapper">
+                <section id="gifts-hanicka-section" class="mb-8 hidden">
+                    <h2 class="text-2xl font-bold text-indigo-700 mb-4 pb-2 border-b border-indigo-200">Pro Haničku</h2>
+                    <div id="gifts-hanicka-container" class="space-y-4"></div>
+                </section>
+                
+                <section id="gifts-oliver-section" class="mb-8 hidden">
+                    <h2 class="text-2xl font-bold text-teal-700 mb-4 pb-2 border-b border-teal-200">Pro Olivera</h2>
+                    <div id="gifts-oliver-container" class="space-y-4"></div>
+                </section>
+
+                <section id="gifts-other-section" class="mb-8 hidden">
+                     <h2 class="text-2xl font-bold text-slate-700 mb-4 pb-2 border-b border-slate-200">Ostatní / Neurčeno</h2>
+                    <div id="gifts-other-container" class="space-y-4"></div>
+                </section>
             </div>
 
-            <!-- Uvítací zpráva pro nepřihlášené -->
             <div id="welcome-msg" class="p-8 bg-white border border-slate-200 rounded-lg text-center">
                 <h2 class="text-2xl font-bold mb-2">Vítejte!</h2>
                 <p class="text-slate-600">Pro zobrazení seznamu dárků se prosím přihlaste pomocí svého Google účtu.</p>
