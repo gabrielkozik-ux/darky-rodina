@@ -40,7 +40,7 @@ const giftsOtherContainer = document.getElementById('gifts-other-container');
 const filterContainer = document.getElementById('filter-container');
 const occasionFilter = document.getElementById('occasion-filter');
 
-// *** NOVÉ REFERENCE PRO ZPRÁVY ***
+// *** REFERENCE PRO ZPRÁVY ***
 const filterNoResultsMsg = document.getElementById('filter-no-results-msg');
 const giftsEmptyDbMsg = document.getElementById('gifts-empty-db-msg');
 
@@ -151,9 +151,9 @@ async function checkUserRoleAndLoadGifts(user) {
 }
 
 function listenForGifts() {
+    // Ujisti se, že máš vytvořený index ve Firebase! (pro orderBy recipient a name)
     const giftsQuery = query(collection(db, 'gifts'), orderBy('recipient'), orderBy('name'));
     
-    // Přidáno chybové hlášení, aby se loader schoval i při chybě
     onSnapshot(giftsQuery, snapshot => {
         loader.classList.add('hidden');
         
@@ -164,7 +164,6 @@ function listenForGifts() {
         
         if (allGifts.length === 0) {
             // Databáze je úplně prázdná
-            // *** UPRAVENO ***
             giftsEmptyDbMsg.classList.remove('hidden'); // Zobrazíme zprávu
             filterNoResultsMsg.classList.add('hidden'); // Skryjeme druhou zprávu
             giftsHanickaSection.classList.add('hidden');
@@ -175,7 +174,6 @@ function listenForGifts() {
         }
 
         // Databáze není prázdná
-        // *** UPRAVENO ***
         giftsEmptyDbMsg.classList.add('hidden'); // Skryjeme zprávu o prázdné DB
 
         filterContainer.classList.remove('hidden'); // Zobrazíme filtr
@@ -186,12 +184,15 @@ function listenForGifts() {
         console.error("Chyba při načítání dárků:", error);
         loader.classList.add('hidden'); // <-- SCHOVEJ LOADER
         // A zobraz uživateli chybovou hlášku
-        giftsWrapper.innerHTML = `<p class="text-center text-red-600 font-semibold p-4">Došlo k chybě při načítání databáze. Zkontrolujte konzoli (F12).</p>`;
+        if (giftsWrapper) {
+            giftsWrapper.innerHTML = `<p class="text-center text-red-600 font-semibold p-4">Došlo k chybě při načítání databáze. Pravděpodobně chybí index (viz F12 konzole).</p>`;
+        }
     });
 }
 
 /**
- * Naplní filtr unikátními příležitostmi z dárků
+ * *** OPRAVENÁ FUNKCE ***
+ * Naplní filtr unikátními příležitostmi z dárků, aniž by rozbila stav.
  */
 function populateOccasionFilter() {
     const defaultOptions = ['all', 'Narozeniny', 'Vánoce', 'Svátek'];
@@ -199,36 +200,50 @@ function populateOccasionFilter() {
     // Získáme aktuálně vybranou hodnotu, abychom ji mohli po přeplnění zachovat
     const currentSelectedValue = occasionFilter.value;
     
-    const existingOptions = Array.from(occasionFilter.options).map(o => o.value);
+    // Získáme všechny unikátní příležitosti z aktuálních dárků
+    const occasionsFromDb = new Set(allGifts.map(g => g.occasion).filter(Boolean));
     
-    const occasions = new Set(allGifts.map(g => g.occasion).filter(Boolean));
-    
-    // Nejprve smažeme staré dynamicky přidané options (necháme jen ty defaultní)
-    Array.from(occasionFilter.options).forEach(option => {
-        if (!defaultOptions.includes(option.value)) {
-            option.remove();
+    // Získáme všechny POUZE dynamické příležitosti, co jsou teď v HTML
+    const currentDynamicOptions = new Set(
+        Array.from(occasionFilter.options)
+             .map(o => o.value)
+             .filter(o => !defaultOptions.includes(o))
+    );
+
+    // 1. Odebereme ty, co už v DB nejsou
+    currentDynamicOptions.forEach(optionValue => {
+        if (!occasionsFromDb.has(optionValue)) {
+            const optionEl = occasionFilter.querySelector(`option[value="${optionValue}"]`);
+            if (optionEl) {
+                optionEl.remove();
+            }
         }
     });
 
-    // Nyní přidáme všechny unikátní z databáze, které ještě neexistují
-    occasions.forEach(occasion => {
-        if (!defaultOptions.includes(occasion) && !existingOptions.includes(occasion)) {
+    // 2. Přidáme ty, co v HTML ještě nejsou
+    occasionsFromDb.forEach(occasionValue => {
+        if (!currentDynamicOptions.has(occasionValue) && !defaultOptions.includes(occasionValue)) {
             const option = document.createElement('option');
-            option.value = occasion;
-            option.textContent = occasion;
+            option.value = occasionValue;
+            option.textContent = occasionValue;
             occasionFilter.appendChild(option);
         }
     });
     
-    // Vrátíme původně vybranou hodnotu
-    occasionFilter.value = currentSelectedValue;
+    // 3. Vrátíme původně vybranou hodnotu (pokud stále existuje)
+    if (Array.from(occasionFilter.options).some(o => o.value === currentSelectedValue)) {
+        occasionFilter.value = currentSelectedValue;
+    } else {
+        // Pokud vybraná příležitost zmizela (např. dárek byl smazán), vrátíme na "Vše"
+        occasionFilter.value = 'all';
+    }
 }
 
 /**
  * Vykreslí dárky na základě aktuálně zvoleného filtru a rozdělí je
  */
 function renderFilteredGifts() {
-    // Vyprázdníme kontejnery
+    // Vyprázníme kontejnery
     giftsHanickaContainer.innerHTML = '';
     giftsOliverContainer.innerHTML = '';
     giftsOtherContainer.innerHTML = '';
@@ -244,13 +259,11 @@ function renderFilteredGifts() {
          giftsOliverSection.classList.add('hidden');
          giftsOtherSection.classList.add('hidden');
          
-         // *** UPRAVENO ***
          // Místo mazání wrapperu jen zobrazíme zprávu
          filterNoResultsMsg.classList.remove('hidden');
          return;
     }
     
-    // *** UPRAVENO ***
     // Skryjeme zprávu o prázdném filtru, protože máme výsledky
     filterNoResultsMsg.classList.add('hidden');
 
@@ -313,7 +326,7 @@ function renderGift(gift, container) {
             if (!isContributor) {
                 statusHTML += `<button data-id="${gift.id}" class="join-group-btn px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600">Přidat se</button>`;
             } else {
-                // NOVÉ: Tlačítko pro opuštění skupiny
+                // Tlačítko pro opuštění skupiny
                 statusHTML += `<button data-id="${gift.id}" class="leave-group-btn px-3 py-1 bg-slate-500 text-white text-sm rounded-md hover:bg-slate-600">Odejít ze skupiny</button>`;
             }
             break;
@@ -401,7 +414,10 @@ function listenForChatMessages(giftId) {
             `;
             chatContainer.appendChild(msgEl);
         });
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+        // Scroll to bottom
+        if (chatContainer.scrollHeight > chatContainer.clientHeight) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
     });
 }
 
@@ -412,103 +428,123 @@ occasionFilter.addEventListener('change', () => {
     renderFilteredGifts();
 });
 
-// Změníme event listener, aby sledoval celý 'giftsWrapper'
-giftsWrapper.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button');
-    if (!btn || !currentUser) return;
+/**
+ * *** OPRAVENÝ HLAVNÍ LISTENER ***
+ * Rozdělil jsem logiku pro dárky a pro komentáře, aby si nepřekážely.
+ */
+if (giftsWrapper) {
+    giftsWrapper.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn || !currentUser) return;
 
-    const giftId = btn.dataset.id || btn.closest('[data-id]')?.dataset.id || btn.closest('.chat-message')?.closest('[id^="chat-"]')?.id.replace('chat-', '');
-    const giftRef = giftId ? doc(db, 'gifts', giftId) : null;
+        const giftId = btn.dataset.id || btn.closest('.card')?.dataset.id || btn.closest('[data-id]')?.dataset.id;
+        
+        // 1. Logika pro AKCE S DÁRKY (Rezervace, opuštění skupiny atd.)
+        // Tyto třídy jsou jen na hlavních tlačítkách dárku
+        const isGiftAction = btn.matches('.claim-solo-btn, .create-group-btn, .join-group-btn, .cancel-solo-claim-btn, .leave-group-btn');
+        
+        if (isGiftAction) {
+            if (!giftId) return; // Nemáme ID dárku, nic neděláme
+            const giftRef = doc(db, 'gifts', giftId);
 
-    // Akce s dárky
-    if (btn.matches('.claim-solo-btn')) await updateDoc(giftRef, { status: 'claimed-solo', claimedBySolo: currentUser.uid, contributors: [], coordinator: null });
-    if (btn.matches('.create-group-btn')) await updateDoc(giftRef, { status: 'group-open', contributors: arrayUnion(currentUser.uid), coordinator: currentUser.uid });
-    if (btn.matches('.join-group-btn')) await updateDoc(giftRef, { contributors: arrayUnion(currentUser.uid) });
-    if (btn.matches('.cancel-solo-claim-btn')) await updateDoc(giftRef, { status: 'available', claimedBySolo: null });
+            try {
+                if (btn.matches('.claim-solo-btn')) await updateDoc(giftRef, { status: 'claimed-solo', claimedBySolo: currentUser.uid, contributors: [], coordinator: null });
+                if (btn.matches('.create-group-btn')) await updateDoc(giftRef, { status: 'group-open', contributors: arrayUnion(currentUser.uid), coordinator: currentUser.uid });
+                if (btn.matches('.join-group-btn')) await updateDoc(giftRef, { contributors: arrayUnion(currentUser.uid) });
+                if (btn.matches('.cancel-solo-claim-btn')) await updateDoc(giftRef, { status: 'available', claimedBySolo: null });
+                
+                if (btn.matches('.leave-group-btn')) {
+                    if (confirm('Opravdu chcete odejít ze skupiny?')) {
+                        const giftDoc = await getDoc(giftRef);
+                        const currentContributors = giftDoc.data().contributors || [];
+                        
+                        if (currentContributors.length === 1 && currentContributors[0] === currentUser.uid) {
+                            await updateDoc(giftRef, { status: 'available', contributors: arrayRemove(currentUser.uid), coordinator: null });
+                        } else {
+                            await updateDoc(giftRef, { contributors: arrayRemove(currentUser.uid) });
+                            // TODO: Pokud odejde koordinátor, mohl by se jmenovat nový
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Chyba při rezervaci dárku:", err);
+            }
+            return; // Po akci s dárkem skončíme
+        }
 
-    // NOVÉ: Opuštění skupiny
-    if (btn.matches('.leave-group-btn')) {
-        if (confirm('Opravdu chcete odejít ze skupiny?')) {
-            // Musíme zjistit, jestli nejde o posledního člena
-            const giftDoc = await getDoc(giftRef);
-            const currentContributors = giftDoc.data().contributors || [];
-            
-            if (currentContributors.length === 1 && currentContributors[0] === currentUser.uid) {
-                // Poslední člen odchází, vrátíme dárek do "available"
-                await updateDoc(giftRef, {
-                    status: 'available',
-                    contributors: arrayRemove(currentUser.uid),
-                    coordinator: null 
-                });
-            } else {
-                // Ještě někdo zbývá, jen odebereme
-                await updateDoc(giftRef, {
-                    contributors: arrayRemove(currentUser.uid)
-                    // TODO: Pokud odejde koordinátor, mohl by se jmenovat nový
-                });
+        // 2. Logika pro AKCE S KOMENTÁŘI (Editace, mazání)
+        // Tyto třídy jsou jen u komentářů
+        const msgEl = btn.closest('.chat-message');
+        if (msgEl) {
+            const msgId = msgEl.dataset.msgId;
+            const chatGiftId = msgEl.closest('[id^="chat-"]').id.replace('chat-', '');
+            if (!msgId || !chatGiftId) return; // Nemáme ID zprávy nebo dárku
+
+            const msgRef = doc(db, 'gifts', chatGiftId, 'chat', msgId);
+
+            try {
+                if (btn.matches('.delete-comment-btn') && confirm('Opravdu smazat komentář?')) {
+                    await deleteDoc(msgRef);
+                }
+                
+                if (btn.matches('.edit-comment-btn')) {
+                    const contentEl = msgEl.querySelector('.message-content');
+                    const originalText = contentEl.querySelector('.message-text').textContent;
+                    contentEl.style.display = 'none'; // Skryjeme původní text
+                    btn.parentElement.style.display = 'none'; // Skryjeme tlačítka
+
+                    const editForm = document.createElement('form');
+                    editForm.className = 'edit-comment-form flex-grow flex gap-2';
+                    editForm.innerHTML = `
+                        <input type="text" value="${originalText}" class="flex-grow border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
+                        <button type="submit" class="px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600">Uložit</button>
+                        <button type="button" class="cancel-edit-btn px-2 py-1 bg-slate-200 text-slate-700 text-xs rounded-md hover:bg-slate-300">Zrušit</button>
+                    `;
+                    msgEl.appendChild(editForm);
+                }
+
+                if (btn.matches('.cancel-edit-btn')) {
+                    msgEl.querySelector('.edit-comment-form').remove();
+                    msgEl.querySelector('.message-content').style.display = 'block';
+                    msgEl.querySelector('.flex-shrink-0').style.display = 'flex';
+                }
+            } catch (err) {
+                 console.error("Chyba při akci s komentářem:", err);
+            }
+            return; // Po akci s komentářem skončíme
+        }
+    });
+
+    // Listener pro formuláře (odeslání nového komentáře, uložení editace)
+    giftsWrapper.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentUser) return;
+        
+        // Odeslání nové zprávy
+        if (e.target.matches('.chat-form')) {
+            const giftId = e.target.querySelector('button').dataset.id;
+            const input = e.target.querySelector('input');
+            const message = input.value.trim();
+            if (message && giftId) {
+                const chatCollectionRef = collection(db, 'gifts', giftId, 'chat');
+                await addDoc(chatCollectionRef, { user: currentUser.displayName, uid: currentUser.uid, message: message, timestamp: serverTimestamp() });
+                input.value = '';
             }
         }
-    }
-
-    // Akce s komentáři
-    const msgId = btn.closest('.chat-message')?.dataset.msgId;
-
-    if (btn.matches('.delete-comment-btn') && confirm('Opravdu smazat komentář?')) {
-        const msgRef = doc(db, 'gifts', giftId, 'chat', msgId);
-        await deleteDoc(msgRef);
-    }
-    
-    if (btn.matches('.edit-comment-btn')) {
-        const msgEl = btn.closest('.chat-message');
-        const contentEl = msgEl.querySelector('.message-content');
-        const originalText = contentEl.querySelector('.message-text').textContent;
-        contentEl.style.display = 'none'; // Skryjeme původní text
-        btn.parentElement.style.display = 'none'; // Skryjeme tlačítka
-
-        const editForm = document.createElement('form');
-        editForm.className = 'edit-comment-form flex-grow flex gap-2';
-        editForm.innerHTML = `
-            <input type="text" value="${originalText}" class="flex-grow border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
-            <button type="submit" class="px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600">Uložit</button>
-            <button type="button" class="cancel-edit-btn px-2 py-1 bg-slate-200 text-slate-700 text-xs rounded-md hover:bg-slate-300">Zrušit</button>
-        `;
-        msgEl.appendChild(editForm);
-    }
-
-    if (btn.matches('.cancel-edit-btn')) {
-        const msgEl = btn.closest('.chat-message');
-        msgEl.querySelector('.edit-comment-form').remove();
-        msgEl.querySelector('.message-content').style.display = 'block';
-        msgEl.querySelector('.flex-shrink-0').style.display = 'flex';
-    }
-});
-
-giftsWrapper.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!currentUser) return;
-    
-    // Odeslání nové zprávy
-    if (e.target.matches('.chat-form')) {
-        const giftId = e.target.querySelector('button').dataset.id;
-        const input = e.target.querySelector('input');
-        const message = input.value.trim();
-        if (message && giftId) {
-            const chatCollectionRef = collection(db, 'gifts', giftId, 'chat');
-            await addDoc(chatCollectionRef, { user: currentUser.displayName, uid: currentUser.uid, message: message, timestamp: serverTimestamp() });
-            input.value = '';
+        
+        // Uložení upravené zprávy
+        if (e.target.matches('.edit-comment-form')) {
+            const giftId = e.target.closest('[id^="chat-"]').id.replace('chat-', '');
+            const msgId = e.target.closest('.chat-message').dataset.msgId;
+            const input = e.target.querySelector('input');
+            const newMessage = input.value.trim();
+            if (newMessage && giftId && msgId) {
+                const msgRef = doc(db, 'gifts', giftId, 'chat', msgId);
+                await updateDoc(msgRef, { message: newMessage });
+                // onSnapshot se postará o překreslení
+            }
         }
-    }
-    
-    // Uložení upravené zprávy
-    if (e.target.matches('.edit-comment-form')) {
-        const giftId = e.target.closest('[id^="chat-"]').id.replace('chat-', '');
-        const msgId = e.target.closest('.chat-message').dataset.msgId;
-        const input = e.target.querySelector('input');
-        const newMessage = input.value.trim();
-        if (newMessage && giftId && msgId) {
-            const msgRef = doc(db, 'gifts', giftId, 'chat', msgId);
-            await updateDoc(msgRef, { message: newMessage });
-            // onSnapshot se postará o překreslení, takže není třeba nic dalšího
-        }
-    }
-});
+    });
+} else {
+    console.error("Kritická chyba: Element 'gifts-wrapper' nebyl nalezen. Ujistěte se, že používáte správný index.html.");
+}
