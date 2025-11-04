@@ -22,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 // POZOR: Vlož sem svůj reCAPTCHA Site Key, který jsi získal
 try {
     const appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider('6LfDTQIsAAAAANXqps6CUrdaWyDH2_u72xvur-V8'), // <-- VLOŽ KLÍČ SEM
+      provider: new ReCaptchaV3Provider('TVUJ_RECAPTCHA_SITE_KEY'), // <-- VLOŽ KLÍČ SEM
       isTokenAutoRefreshEnabled: true
     });
     console.log("Firebase App Check inicializován.");
@@ -67,7 +67,7 @@ const addGiftForm = document.getElementById('add-gift-form');
 const addGiftLoader = document.getElementById('add-gift-loader');
 const addGiftSubmitBtn = document.getElementById('add-gift-submit');
 const cancelEditBtn = document.getElementById('cancel-edit-btn');
-const giftIsContributionCheckbox = document.getElementById('gift-is-contribution'); // NOVÉ
+const giftIsContributionCheckbox = document.getElementById('gift-is-contribution'); 
 
 // *** Modální okno ***
 const reservationModal = document.getElementById('reservation-modal');
@@ -81,9 +81,19 @@ const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 // --- Globální proměnné ----------------------------------------------------
 let currentUser = null;
 let isAdmin = false;
-let allGifts = []; // Budeme zde držet všechny dárky pro filtrování
-let currentModalAction = { id: null, action: null }; // Pro ukládání stavu modálu
-let currentEditGiftId = null; // Pro sledování stavu úprav
+let allGifts = []; 
+let currentModalAction = { id: null, action: null }; 
+let currentEditGiftId = null; 
+
+// *** NOVÉ: Mapa pro chytré filtrování ***
+const occasionCategoryMap = {
+    'Vánoce': ['vanoce', 'vánoce', 'vianoce'],
+    'Narozeniny': ['narozeniny', 'narodeniny'],
+    'Svátek': ['svátek', 'svatek', 'meniny']
+    // Zde můžeš přidat další hlavní kategorie a jejich mutace
+};
+// Klíče z mapy, které mají být ve filtru (plus 'all')
+const staticFilterOptions = ['all', ...Object.keys(occasionCategoryMap)];
 
 
 // --- Autentizace ---------------------------------------------------------
@@ -236,8 +246,8 @@ function listenForGifts() {
 
         giftsEmptyDbMsg.classList.add('hidden');
         filterContainer.classList.remove('hidden');
-        populateOccasionFilter();
-        renderFilteredGifts();
+        populateOccasionFilter(); // ZAVOLÁ UPRAVENOU FUNKCI
+        renderFilteredGifts(); // ZAVOLÁ UPRAVENOU FUNKCI
 
     }, error => {
         console.error("Chyba při načítání dárků:", error);
@@ -248,32 +258,22 @@ function listenForGifts() {
     });
 }
 
+/**
+ * *** UPRAVENO: Funkce pro statický filtr ***
+ * Odstraní z filtru všechny "spam" položky (např. Vánoce 2025).
+ */
 function populateOccasionFilter() {
-    const defaultOptions = ['all', 'Narozeniny', 'Vánoce', 'Svátek'];
     const currentSelectedValue = occasionFilter.value;
-    const occasionsFromDb = new Set(allGifts.map(g => g.occasion).filter(Boolean));
-    const currentDynamicOptions = new Set(
-        Array.from(occasionFilter.options)
-             .map(o => o.value)
-             .filter(o => !defaultOptions.includes(o))
-    );
-
-    currentDynamicOptions.forEach(optionValue => {
-        if (!occasionsFromDb.has(optionValue)) {
-            const optionEl = occasionFilter.querySelector(`option[value="${optionValue}"]`);
-            if (optionEl) optionEl.remove();
-        }
-    });
-
-    occasionsFromDb.forEach(occasionValue => {
-        if (!currentDynamicOptions.has(occasionValue) && !defaultOptions.includes(occasionValue)) {
-            const option = document.createElement('option');
-            option.value = occasionValue;
-            option.textContent = occasionValue;
-            occasionFilter.appendChild(option);
+    
+    // Projdeme všechny <option> ve filtru
+    Array.from(occasionFilter.options).forEach(option => {
+        // Pokud hodnota <option> NENÍ v našem seznamu povolených, smažeme ji
+        if (!staticFilterOptions.includes(option.value)) {
+            option.remove();
         }
     });
     
+    // Zkontrolujeme, zda vybraná hodnota stále existuje, jinak resetujeme na "all"
     if (Array.from(occasionFilter.options).some(o => o.value === currentSelectedValue)) {
         occasionFilter.value = currentSelectedValue;
     } else {
@@ -281,13 +281,38 @@ function populateOccasionFilter() {
     }
 }
 
+
+/**
+ * *** UPRAVENO: Funkce pro chytré filtrování ***
+ * Používá occasionCategoryMap k nalezení všech mutací.
+ */
 function renderFilteredGifts() {
     giftsHanickaContainer.innerHTML = '';
     giftsOliverContainer.innerHTML = '';
     giftsOtherContainer.innerHTML = '';
 
     const selectedOccasion = occasionFilter.value;
-    const filteredGifts = allGifts.filter(gift => selectedOccasion === 'all' || gift.occasion === selectedOccasion);
+    
+    const filteredGifts = allGifts.filter(gift => {
+        // Vždy zobrazit vše, pokud je vybráno "all"
+        if (selectedOccasion === 'all') return true;
+        // Přeskočit dárky, které nemají příležitost nastavenou
+        if (!gift.occasion) return false;
+
+        // Získáme seznam mutací pro vybranou kategorii (např. ['vanoce', 'vánoce', 'vianoce'])
+        const mutations = occasionCategoryMap[selectedOccasion];
+
+        // Pokud kategorie není v naší mapě, vrátíme se k jednoduchému porovnání
+        if (!mutations) {
+             return gift.occasion.toLowerCase().startsWith(selectedOccasion.toLowerCase());
+        }
+
+        // Převedeme příležitost dárku na malá písmena pro porovnání
+        const giftOccasionLower = gift.occasion.toLowerCase();
+
+        // Zjistíme, jestli příležitost dárku začíná na NĚKTEROU z našich mutací
+        return mutations.some(prefix => giftOccasionLower.startsWith(prefix));
+    });
 
     if (filteredGifts.length === 0) {
          giftsHanickaSection.classList.add('hidden');
@@ -298,6 +323,7 @@ function renderFilteredGifts() {
     }
     
     filterNoResultsMsg.classList.add('hidden');
+
     const gifts = { hanicka: [], oliver: [], other: [] };
 
     filteredGifts.forEach(gift => {
@@ -317,13 +343,10 @@ function renderFilteredGifts() {
 }
 
 
-/**
- * *** PŘEDĚLANÁ FUNKCE RENDER GIFT ***
- */
 function renderGift(gift, container) {
     const isContributor = gift.contributors && gift.contributors.includes(currentUser.uid);
     const isSoloClaimer = gift.claimedBySolo === currentUser.uid;
-    const isContributionGift = gift.giftType === 'contribution'; // NOVÉ
+    const isContributionGift = gift.giftType === 'contribution'; 
 
     const card = document.createElement('div');
     card.className = "bg-white p-5 rounded-lg border border-slate-200 shadow-sm";
@@ -332,15 +355,12 @@ function renderGift(gift, container) {
     let editOccasionBtn = '';
     let adminControls = '';
 
-    // Tlačítko pro úpravu příležitosti (pro přispěvatele nebo sólo claimera)
     if (isSoloClaimer || isContributor) {
         editOccasionBtn = `<button data-id="${gift.id}" data-action="edit-occasion" class="edit-occasion-btn ml-2 text-xs text-slate-500 hover:text-indigo-600" title="Upravit příležitost">✏️</button>`;
     }
     
-    // Admin tlačítka
     if (isAdmin) {
         let adminResetBtn = '';
-        // Resetovací tlačítko dává smysl, jen pokud to NENÍ finanční příspěvek A NENÍ volný
         if (!isContributionGift && gift.status !== 'available') {
              adminResetBtn = `<button data-id="${gift.id}" class="admin-reset-btn w-full px-3 py-1 bg-orange-600 text-white text-xs font-semibold rounded-md hover:bg-orange-700">Resetovat rezervaci</button>`;
         }
@@ -354,7 +374,7 @@ function renderGift(gift, container) {
     }
 
     if (isContributionGift) {
-        // --- NOVÁ LOGIKA PRO FINANČNÍ PŘÍSPĚVEK ---
+        // --- Finanční příspěvek ---
         statusHTML = `<p class="text-sm text-blue-600 font-semibold mb-3">Finanční příspěvek (${gift.contributors?.length || 0})</p>`;
         if (!isContributor) {
             statusHTML += `<button data-id="${gift.id}" class="join-group-btn px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 w-full">Chci přispět</button>`;
@@ -363,7 +383,7 @@ function renderGift(gift, container) {
         }
 
     } else {
-        // --- STÁVAJÍCÍ LOGIKA PRO BĚŽNÉ DÁRKY ---
+        // --- Běžné dárky ---
         switch(gift.status) {
             case 'available':
                 statusHTML = `
@@ -406,12 +426,10 @@ function renderGift(gift, container) {
         }
     }
     
-    statusHTML += adminControls; // Přidáme admin tlačítka
+    statusHTML += adminControls; 
 
     let chatHTML = '';
-    // Chat se zobrazí, pokud jsem přispěvatel A (jedná se o finanční příspěvek NEBO o skupinový dárek)
     if (isContributor && (isContributionGift || gift.status === 'group-open' || gift.status === 'claimed-group')) {
-        // Formulář chatu se zobrazí, POKUD (je to finanční příspěvek NEBO je skupina otevřená)
         const showChatForm = (isContributionGift || gift.status === 'group-open');
         
         chatHTML = `
@@ -428,7 +446,6 @@ function renderGift(gift, container) {
         listenForChatMessages(gift.id);
     }
     
-    // Odkaz na dárek (nezobrazí se u finančního příspěvku)
     const linkHTML = (gift.link && !isContributionGift) ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Odkaz na dárek</a>` : '';
 
     card.innerHTML = `
@@ -449,9 +466,6 @@ function renderGift(gift, container) {
     container.appendChild(card);
 }
 
-/**
- * BEZPEČNÁ VERZE - Opraveno proti XSS
- */
 function listenForChatMessages(giftId) {
     const chatQuery = query(collection(db, 'gifts', giftId, 'chat'), orderBy('timestamp'));
     onSnapshot(chatQuery, snapshot => {
@@ -471,7 +485,6 @@ function listenForChatMessages(giftId) {
 
             let actionsHTML = '';
             const gift = allGifts.find(g => g.id === giftId);
-            // Povolit akci POKUD (je skupina otevřená NEBO je to finanční příspěvek)
             if (isMyMessage && gift && (gift.status === 'group-open' || gift.giftType === 'contribution')) {
                 actionsHTML = `
                     <div class="flex items-center gap-2 flex-shrink-0">
@@ -581,16 +594,15 @@ if (addGiftForm) {
 
         const rawOccasion = document.getElementById('gift-occasion').value.trim();
         const normalizedOccasion = rawOccasion.charAt(0).toUpperCase() + rawOccasion.slice(1);
-        const isContribution = giftIsContributionCheckbox.checked; // NOVÉ
+        const isContribution = giftIsContributionCheckbox.checked; 
 
-        // Data z formuláře
         const giftData = {
             name: document.getElementById('gift-name').value,
             recipient: document.getElementById('gift-recipient').value,
             occasion: normalizedOccasion || 'Neurčeno',
             description: document.getElementById('gift-description').value || '',
             link: document.getElementById('gift-link').value || '',
-            giftType: isContribution ? 'contribution' : 'item' // NOVÉ POLE
+            giftType: isContribution ? 'contribution' : 'item'
         };
 
         try {
@@ -603,7 +615,7 @@ if (addGiftForm) {
                 // --- Režim PŘIDÁNÍ ---
                 const newGiftData = {
                     ...giftData,
-                    status: 'available', // Výchozí stav (u 'contribution' se ignoruje)
+                    status: 'available', 
                     claimedBySolo: null,
                     contributors: [],
                     coordinator: null
@@ -611,7 +623,7 @@ if (addGiftForm) {
                 await addDoc(collection(db, 'gifts'), newGiftData);
                 console.log("Nový dárek přidán.");
             }
-            resetAdminForm(); // Vyčistí formulář po úspěchu
+            resetAdminForm(); 
         } catch (err) {
             console.error("Chyba při ukládání dárku:", err);
             alert("Došlo k chybě při ukládání dárku.");
@@ -662,11 +674,9 @@ if (giftsWrapper) {
                     const giftData = giftDoc.data();
                     const currentContributors = giftData.contributors || [];
                     
-                    // U finančního příspěvku jen odebereme, nic neměníme
                     if (giftData.giftType === 'contribution') {
                          await updateDoc(giftRef, { contributors: arrayRemove(currentUser.uid) });
                     } 
-                    // U běžného dárku řešíme, zda je poslední
                     else if (currentContributors.length === 1 && currentContributors[0] === currentUser.uid) {
                         await updateDoc(giftRef, { status: 'available', contributors: arrayRemove(currentUser.uid), coordinator: null });
                     } else {
@@ -675,7 +685,7 @@ if (giftsWrapper) {
                 }
             }
             
-            // Uzavřít skupinu (tlačítko se u fin. příspěvku nezobrazí)
+            // Uzavřít skupinu
             if (btn.matches('.finalize-group-btn')) {
                 if (confirm('Opravdu chcete skupinu označit za domluvenou? Chat bude poté uzamčen.')) {
                     await updateDoc(giftRef, { status: 'claimed-group' });
@@ -709,7 +719,7 @@ if (giftsWrapper) {
                         document.getElementById('gift-occasion').value = gift.occasion || '';
                         document.getElementById('gift-description').value = gift.description || '';
                         document.getElementById('gift-link').value = gift.link || '';
-                        giftIsContributionCheckbox.checked = (gift.giftType === 'contribution'); // NOVÉ
+                        giftIsContributionCheckbox.checked = (gift.giftType === 'contribution'); 
                         
                         // 2. Změníme stav formuláře
                         adminFormTitle.textContent = `Právě upravujete: ${gift.name}`;
@@ -818,3 +828,4 @@ if (giftsWrapper) {
 } else {
     console.error("Kritická chyba: Element 'gifts-wrapper' nebyl nalezen. Ujistěte se, že používáte správný index.html.");
 }
+
