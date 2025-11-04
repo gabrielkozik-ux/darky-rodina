@@ -1,5 +1,7 @@
 // --- Importy potřebných funkcí z Firebase SDK -----------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+// *** NOVÝ IMPORT PRO APP CHECK ***
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app-check.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc, arrayUnion, arrayRemove, serverTimestamp, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js";
 
@@ -15,6 +17,21 @@ const firebaseConfig = {
 
 // --- Inicializace Firebase a služeb --------------------------------------
 const app = initializeApp(firebaseConfig);
+
+// --- NOVÉ: Inicializace App Check ---------------------------------------
+// POZOR: Nahraď 'TVUJ_RECAPTCHA_SITE_KEY' klíčem, který získáš v kroku 2
+// Tento klíč JE VEŘEJNÝ, je v pořádku, že je vidět v kódu.
+try {
+    const appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider('6LfDTQIsAAAAANXqps6CUrdaWyDH2_u72xvur-V8'),
+      isTokenAutoRefreshEnabled: true
+    });
+    console.log("Firebase App Check inicializován.");
+} catch (error) {
+    console.error("Chyba při inicializaci Firebase App Check:", error);
+}
+// --- KONEC App Check ----------------------------------------------------
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 
