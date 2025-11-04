@@ -60,13 +60,13 @@ const occasionFilter = document.getElementById('occasion-filter');
 const filterNoResultsMsg = document.getElementById('filter-no-results-msg');
 const giftsEmptyDbMsg = document.getElementById('gifts-empty-db-msg');
 
-// *** NOVÉ: Admin Panel ***
+// *** Admin Panel ***
 const adminPanel = document.getElementById('admin-panel');
 const addGiftForm = document.getElementById('add-gift-form');
 const addGiftLoader = document.getElementById('add-gift-loader');
 const addGiftSubmitBtn = document.getElementById('add-gift-submit');
 
-// *** NOVÉ: Modální okno ***
+// *** Modální okno ***
 const reservationModal = document.getElementById('reservation-modal');
 const modalTitle = document.getElementById('modal-title');
 const modalGiftName = document.getElementById('modal-gift-name');
@@ -410,7 +410,7 @@ function renderGift(gift, container) {
         listenForChatMessages(gift.id);
     }
     
-    // NOVĚ: Odkaz na dárek
+    // Odkaz na dárek
     const linkHTML = gift.link ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Odkaz na dárek</a>` : '';
 
     card.innerHTML = `
@@ -493,7 +493,7 @@ function listenForChatMessages(giftId) {
 }
 
 
-// --- NOVÉ: Funkce pro modální okno ---
+// --- Funkce pro modální okno ---
 function openReservationModal(giftId, action) {
     const gift = allGifts.find(g => g.id === giftId);
     if (!gift) return;
@@ -526,11 +526,15 @@ modalConfirmBtn.addEventListener('click', async () => {
     const { id, action } = currentModalAction;
     if (!id || !action) return;
 
-    const newOccasion = modalOccasion.value.trim();
-    if (!newOccasion) {
+    // *** ZMĚNA ZDE: NORMALIZACE VSTUPU ***
+    const rawOccasion = modalOccasion.value.trim();
+    if (!rawOccasion) {
         alert("Příležitost nesmí být prázdná.");
         return;
     }
+    // Udělá první písmeno velké, zbytek nechá (aby "Vánoce 2025" zůstalo "Vánoce 2025")
+    const newOccasion = rawOccasion.charAt(0).toUpperCase() + rawOccasion.slice(1);
+    // *** KONEC ZMĚNY ***
     
     const giftRef = doc(db, 'gifts', id);
     let updateData = {
@@ -574,20 +578,24 @@ occasionFilter.addEventListener('change', () => {
     renderFilteredGifts();
 });
 
-// --- NOVÉ: Listener pro Admin formulář ---
+// --- Listener pro Admin formulář ---
 if (addGiftForm) {
     addGiftForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         addGiftLoader.classList.remove('hidden');
         addGiftSubmitBtn.disabled = true;
 
-        const formData = new FormData(addGiftForm);
+        // *** ZMĚNA ZDE: NORMALIZACE VSTUPU ***
+        const rawOccasion = document.getElementById('gift-occasion').value.trim();
+        const normalizedOccasion = rawOccasion.charAt(0).toUpperCase() + rawOccasion.slice(1);
+        // *** KONEC ZMĚNY ***
+
         const newGift = {
-            name: formData.get('gift-name'),
-            recipient: formData.get('gift-recipient'),
-            occasion: formData.get('gift-occasion'),
-            description: formData.get('gift-description') || '',
-            link: formData.get('gift-link') || '',
+            name: document.getElementById('gift-name').value,
+            recipient: document.getElementById('gift-recipient').value,
+            occasion: normalizedOccasion || 'Neurčeno', // Pokud admin nic nevyplní
+            description: document.getElementById('gift-description').value || '',
+            link: document.getElementById('gift-link').value || '',
             // Výchozí stav
             status: 'available',
             claimedBySolo: null,
@@ -659,14 +667,14 @@ if (giftsWrapper) {
                 }
             }
             
-            // NOVÉ: Uzavřít skupinu
+            // Uzavřít skupinu
             if (btn.matches('.finalize-group-btn')) {
                 if (confirm('Opravdu chcete skupinu označit za domluvenou? Chat bude poté uzamčen.')) {
                     await updateDoc(giftRef, { status: 'claimed-group' });
                 }
             }
             
-            // NOVÉ: Admin reset
+            // Admin reset
             if (btn.matches('.admin-reset-btn')) {
                  if (confirm('ADMIN: Opravdu chcete tuto rezervaci zrušit a vrátit dárek na "Dostupné"?')) {
                     await updateDoc(giftRef, { 
