@@ -834,3 +834,45 @@ if (giftsWrapper) {
 } else {
     console.error("Kritická chyba: Element 'gifts-wrapper' nebyl nalezen. Ujistěte se, že používáte správný index.html.");
 }
+// --- Animace létajících dárečků ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Najdeme všechny ikony dárků
+    const gifts = document.querySelectorAll('#gift-container .gift-icon');
+    
+    // Funkce pro animaci jedné ikony
+    function animateGift(gift) {
+        gift.style.opacity = '0'; // Začneme skrytí
+
+        // Dáme animaci chvilku "oddech", než se znovu spustí
+        setTimeout(() => {
+            const randomSize = Math.random() * 50 + 20; // Velikost 20px až 70px
+            const randomTop = Math.random() * 100; // 0% až 100%
+            const randomLeft = Math.random() * 100; // 0% až 100%
+            const randomRotate = Math.random() * 90 - 45; // -45deg až +45deg
+            const randomOpacity = Math.random() * 0.3 + 0.1; // 0.1 až 0.4
+
+            gift.style.width = `${randomSize}px`;
+            gift.style.height = `${randomSize}px`; // Zajistíme, že SVG je čtvercové
+            gift.style.top = `${randomTop}%`;
+            gift.style.left = `${randomLeft}%`;
+            gift.style.transform = `rotate(${randomRotate}deg) scale(1)`;
+            gift.style.opacity = randomOpacity;
+
+            // Nastavíme mizení
+            setTimeout(() => {
+                gift.style.opacity = '0';
+                gift.style.transform = `rotate(${randomRotate}deg) scale(0.5)`;
+            }, 4000 + Math.random() * 2000); // Zůstane viditelný 4-6s
+        }, 2500); // Začne po 2.5s pauze
+    }
+
+    // Spustíme animaci pro každou ikonu
+    gifts.forEach((gift, index) => {
+        setTimeout(() => {
+            animateGift(gift); // Spustíme poprvé
+            
+            // A pak opakujeme v intervalu
+            setInterval(() => animateGift(gift), 8000 + Math.random() * 2000); // Opakovat každých 8-10s
+        }, index * 1500); // Spustíme je postupně, ať nelétají všechny najednou
+    });
+});
