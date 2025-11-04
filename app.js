@@ -380,12 +380,17 @@ function renderGift(gift, container) {
     container.appendChild(card);
 }
 
+/**
+ * BEZPEČNÁ VERZE - Opraveno proti XSS
+ * Naslouchá zprávám v chatu pro daný dárek.
+ */
 function listenForChatMessages(giftId) {
     const chatQuery = query(collection(db, 'gifts', giftId, 'chat'), orderBy('timestamp'));
     onSnapshot(chatQuery, snapshot => {
         const chatContainer = document.getElementById(`chat-${giftId}`);
         if (!chatContainer) return;
         chatContainer.innerHTML = '';
+        
         snapshot.forEach(doc => {
             const msg = doc.data();
             const msgEl = document.createElement('div');
@@ -397,6 +402,7 @@ function listenForChatMessages(giftId) {
             const fontWeight = isMyMessage ? 'font-bold' : 'font-semibold';
 
             let actionsHTML = '';
+            // Tlačítka pro editaci a mazání (tento HTML je bezpečný, je generovaný námi)
             if (isMyMessage) {
                 actionsHTML = `
                     <div class="flex items-center gap-2 flex-shrink-0">
@@ -406,20 +412,47 @@ function listenForChatMessages(giftId) {
                 `;
             }
 
-            msgEl.innerHTML = `
-                <div class="message-content">
-                    <p><strong class="${fontWeight}">${sender}:</strong> <span class="message-text">${msg.message}</span></p>
-                </div>
-                ${actionsHTML}
-            `;
+            // --- BEZPEČNÁ ČÁST (místo msgEl.innerHTML) ---
+            
+            // 1. Vytvoříme div pro obsah
+            const contentEl = document.createElement('div');
+            contentEl.className = 'message-content';
+
+            // 2. Vytvoříme odstavec <p>
+            const pEl = document.createElement('p');
+            
+            // 3. Vytvoříme <strong> pro jméno odesílatele
+            const strongEl = document.createElement('strong');
+            strongEl.className = fontWeight;
+            strongEl.textContent = sender + ':'; // BEZPEČNÉ vložení jména
+            
+            // 4. Vytvoříme <span> pro text zprávy
+            const spanEl = document.createElement('span');
+            spanEl.className = 'message-text';
+            spanEl.textContent = ' ' + msg.message; // BEZPEČNÉ vložení zprávy (s mezerou)
+
+            // 5. Sestavíme to dohromady
+            pEl.appendChild(strongEl);
+            pEl.appendChild(spanEl);
+            contentEl.appendChild(pEl);
+
+            // 6. Přidáme bezpečný obsah do elementu zprávy
+            msgEl.appendChild(contentEl);
+            
+            // 7. Přidáme naše bezpečná tlačítka
+            msgEl.insertAdjacentHTML('beforeend', actionsHTML);
+            // --- KONEC BEZPEČNÉ ČÁSTI ---
+
             chatContainer.appendChild(msgEl);
         });
+        
         // Scroll to bottom
         if (chatContainer.scrollHeight > chatContainer.clientHeight) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     });
 }
+
 
 // --- Event Listeners pro akce ---
 
@@ -487,21 +520,45 @@ if (giftsWrapper) {
                     await deleteDoc(msgRef);
                 }
                 
+                // --- ZAČÁTEK BEZPEČNÉ ČÁSTI PRO EDITACI ---
                 if (btn.matches('.edit-comment-btn')) {
                     const contentEl = msgEl.querySelector('.message-content');
-                    const originalText = contentEl.querySelector('.message-text').textContent;
+                    // .trim() odebere mezeru, kterou jsem přidal v listenForChatMessages
+                    const originalText = contentEl.querySelector('.message-text').textContent.trim();
                     contentEl.style.display = 'none'; // Skryjeme původní text
                     btn.parentElement.style.display = 'none'; // Skryjeme tlačítka
 
                     const editForm = document.createElement('form');
                     editForm.className = 'edit-comment-form flex-grow flex gap-2';
-                    editForm.innerHTML = `
-                        <input type="text" value="${originalText}" class="flex-grow border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
-                        <button type="submit" class="px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600">Uložit</button>
-                        <button type="button" class="cancel-edit-btn px-2 py-1 bg-slate-200 text-slate-700 text-xs rounded-md hover:bg-slate-300">Zrušit</button>
-                    `;
+
+                    // 1. Vytvoříme input
+                    const inputEl = document.createElement('input');
+                    inputEl.type = 'text';
+                    inputEl.value = originalText; // BEZPEČNÉ vložení textu do HODNOTY
+                    inputEl.className = 'flex-grow border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500';
+                    inputEl.required = true;
+
+                    // 2. Vytvoříme tlačítko Uložit
+                    const saveBtn = document.createElement('button');
+                    saveBtn.type = 'submit';
+                    saveBtn.className = 'px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600';
+                    saveBtn.textContent = 'Uložit';
+
+                    // 3. Vytvoříme tlačítko Zrušit
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.type = 'button';
+                    cancelBtn.className = 'cancel-edit-btn px-2 py-1 bg-slate-200 text-slate-700 text-xs rounded-md hover:bg-slate-300';
+                    cancelBtn.textContent = 'Zrušit';
+
+                    // 4. Sestavíme formulář
+                    editForm.appendChild(inputEl);
+                    editForm.appendChild(saveBtn);
+                    editForm.appendChild(cancelBtn);
+                    
+                    // 5. Přidáme formulář do elementu zprávy
                     msgEl.appendChild(editForm);
                 }
+                // --- KONEC BEZPEČNÉ ČÁSTI PRO EDITACI ---
 
                 if (btn.matches('.cancel-edit-btn')) {
                     msgEl.querySelector('.edit-comment-form').remove();
