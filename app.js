@@ -1,6 +1,6 @@
 // --- Importy potřebných funkcí z Firebase SDK -----------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
-// *** NOVÝ IMPORT PRO APP CHECK ***
+// *** Import PRO APP CHECK ***
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app-check.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, updateDoc, arrayUnion, arrayRemove, serverTimestamp, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-firestore.js";
@@ -18,12 +18,11 @@ const firebaseConfig = {
 // --- Inicializace Firebase a služeb --------------------------------------
 const app = initializeApp(firebaseConfig);
 
-// --- NOVÉ: Inicializace App Check ---------------------------------------
-// POZOR: Nahraď 'TVUJ_RECAPTCHA_SITE_KEY' klíčem, který získáš v kroku 2
-// Tento klíč JE VEŘEJNÝ, je v pořádku, že je vidět v kódu.
+// --- Inicializace App Check ---------------------------------------
+// POZOR: Vlož sem svůj reCAPTCHA Site Key, který jsi získal
 try {
     const appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider('6LfDTQIsAAAAANXqps6CUrdaWyDH2_u72xvur-V8'),
+      provider: new ReCaptchaV3Provider('6LfDTQIsAAAAANXqps6CUrdaWyDH2_u72xvur-V8'), // <-- VLOŽ KLÍČ SEM
       isTokenAutoRefreshEnabled: true
     });
     console.log("Firebase App Check inicializován.");
@@ -44,7 +43,7 @@ const welcomeMsg = document.getElementById('welcome-msg');
 const pendingApprovalMsg = document.getElementById('pending-approval-msg');
 const loader = document.getElementById('loader');
 
-// Nové reference pro rozdělené kontejnery
+// Kontejnery dárků
 const giftsWrapper = document.getElementById('gifts-wrapper');
 const giftsHanickaSection = document.getElementById('gifts-hanicka-section');
 const giftsHanickaContainer = document.getElementById('gifts-hanicka-container');
@@ -53,19 +52,35 @@ const giftsOliverContainer = document.getElementById('gifts-oliver-container');
 const giftsOtherSection = document.getElementById('gifts-other-section');
 const giftsOtherContainer = document.getElementById('gifts-other-container');
 
-// Nové reference pro filtr
+// Filtr
 const filterContainer = document.getElementById('filter-container');
 const occasionFilter = document.getElementById('occasion-filter');
 
-// *** REFERENCE PRO ZPRÁVY ***
+// Zprávy
 const filterNoResultsMsg = document.getElementById('filter-no-results-msg');
 const giftsEmptyDbMsg = document.getElementById('gifts-empty-db-msg');
+
+// *** NOVÉ: Admin Panel ***
+const adminPanel = document.getElementById('admin-panel');
+const addGiftForm = document.getElementById('add-gift-form');
+const addGiftLoader = document.getElementById('add-gift-loader');
+const addGiftSubmitBtn = document.getElementById('add-gift-submit');
+
+// *** NOVÉ: Modální okno ***
+const reservationModal = document.getElementById('reservation-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalGiftName = document.getElementById('modal-gift-name');
+const modalOccasion = document.getElementById('modal-occasion');
+const modalCancelBtn = document.getElementById('modal-cancel-btn');
+const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 
 
 // --- Globální proměnné ----------------------------------------------------
 let currentUser = null;
 let isAdmin = false;
 let allGifts = []; // Budeme zde držet všechny dárky pro filtrování
+let currentModalAction = { id: null, action: null }; // Pro ukládání stavu modálu
+
 
 // --- Autentizace ---------------------------------------------------------
 loginBtn.addEventListener('click', () => {
@@ -93,6 +108,7 @@ onAuthStateChanged(auth, user => {
         pendingApprovalMsg.classList.add('hidden');
         loader.classList.add('hidden');
         filterContainer.classList.add('hidden');
+        adminPanel.classList.add('hidden'); // Skrýt admin panel při odhlášení
         
         // Vyčistit všechny kontejnery
         giftsHanickaContainer.innerHTML = '';
@@ -116,10 +132,20 @@ onAuthStateChanged(auth, user => {
 function linkify(text) {
     if (!text) return '';
     const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+    // Nahradíme pouze text, který je URL
     return text.replace(urlRegex, function(url) {
-        // Zkrátíme zobrazený text, pokud je příliš dlouhý, ale odkaz zůstane celý
-        const shortUrl = url.length > 50 ? url.substring(0, 47) + '...' : url;
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">${shortUrl}</a>`;
+        let displayUrl = url;
+        // Zkusíme odstranit protokol pro zkrácení
+        try {
+            const urlObj = new URL(url);
+            displayUrl = urlObj.hostname.replace('www.', '') + (urlObj.pathname.length > 1 ? urlObj.pathname : '');
+        } catch (e) { /* Zůstane původní url */ }
+        
+        if (displayUrl.length > 50) {
+            displayUrl = displayUrl.substring(0, 47) + '...';
+        }
+        
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">${displayUrl}</a>`;
     });
 }
 
@@ -128,7 +154,7 @@ async function checkUserRoleAndLoadGifts(user) {
     loader.classList.remove('hidden');
     loader.classList.add('flex');
     
-    // Vyčistit všechny kontejnery
+    // Reset UI
     giftsHanickaContainer.innerHTML = '';
     giftsOliverContainer.innerHTML = '';
     giftsOtherContainer.innerHTML = '';
@@ -137,6 +163,7 @@ async function checkUserRoleAndLoadGifts(user) {
     giftsOtherSection.classList.add('hidden');
     filterNoResultsMsg.classList.add('hidden');
     giftsEmptyDbMsg.classList.add('hidden');
+    adminPanel.classList.add('hidden');
     
     const userRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userRef);
@@ -159,6 +186,9 @@ async function checkUserRoleAndLoadGifts(user) {
         isAdmin = userData.role === 'admin';
         if (userData.role === 'approved' || userData.role === 'admin') {
             pendingApprovalMsg.classList.add('hidden');
+            if (isAdmin) {
+                adminPanel.classList.remove('hidden'); // Zobrazit admin panel
+            }
             listenForGifts(); // Začneme naslouchat dárkům
         } else {
             pendingApprovalMsg.classList.remove('hidden');
@@ -174,15 +204,14 @@ function listenForGifts() {
     onSnapshot(giftsQuery, snapshot => {
         loader.classList.add('hidden');
         
-        allGifts = [];
+        allGifts = []; // Naplníme globální pole
         snapshot.forEach(doc => {
             allGifts.push({ id: doc.id, ...doc.data() });
         });
         
         if (allGifts.length === 0) {
-            // Databáze je úplně prázdná
-            giftsEmptyDbMsg.classList.remove('hidden'); // Zobrazíme zprávu
-            filterNoResultsMsg.classList.add('hidden'); // Skryjeme druhou zprávu
+            giftsEmptyDbMsg.classList.remove('hidden');
+            filterNoResultsMsg.classList.add('hidden');
             giftsHanickaSection.classList.add('hidden');
             giftsOliverSection.classList.add('hidden');
             giftsOtherSection.classList.add('hidden');
@@ -190,17 +219,14 @@ function listenForGifts() {
             return;
         }
 
-        // Databáze není prázdná
-        giftsEmptyDbMsg.classList.add('hidden'); // Skryjeme zprávu o prázdné DB
-
-        filterContainer.classList.remove('hidden'); // Zobrazíme filtr
+        giftsEmptyDbMsg.classList.add('hidden');
+        filterContainer.classList.remove('hidden');
         populateOccasionFilter();
         renderFilteredGifts();
 
     }, error => {
         console.error("Chyba při načítání dárků:", error);
-        loader.classList.add('hidden'); // <-- SCHOVEJ LOADER
-        // A zobraz uživateli chybovou hlášku
+        loader.classList.add('hidden');
         if (giftsWrapper) {
             giftsWrapper.innerHTML = `<p class="text-center text-red-600 font-semibold p-4">Došlo k chybě při načítání databáze. Pravděpodobně chybí index (viz F12 konzole).</p>`;
         }
@@ -208,36 +234,25 @@ function listenForGifts() {
 }
 
 /**
- * *** OPRAVENÁ FUNKCE ***
  * Naplní filtr unikátními příležitostmi z dárků, aniž by rozbila stav.
  */
 function populateOccasionFilter() {
     const defaultOptions = ['all', 'Narozeniny', 'Vánoce', 'Svátek'];
-    
-    // Získáme aktuálně vybranou hodnotu, abychom ji mohli po přeplnění zachovat
     const currentSelectedValue = occasionFilter.value;
-    
-    // Získáme všechny unikátní příležitosti z aktuálních dárků
     const occasionsFromDb = new Set(allGifts.map(g => g.occasion).filter(Boolean));
-    
-    // Získáme všechny POUZE dynamické příležitosti, co jsou teď v HTML
     const currentDynamicOptions = new Set(
         Array.from(occasionFilter.options)
              .map(o => o.value)
              .filter(o => !defaultOptions.includes(o))
     );
 
-    // 1. Odebereme ty, co už v DB nejsou
     currentDynamicOptions.forEach(optionValue => {
         if (!occasionsFromDb.has(optionValue)) {
             const optionEl = occasionFilter.querySelector(`option[value="${optionValue}"]`);
-            if (optionEl) {
-                optionEl.remove();
-            }
+            if (optionEl) optionEl.remove();
         }
     });
 
-    // 2. Přidáme ty, co v HTML ještě nejsou
     occasionsFromDb.forEach(occasionValue => {
         if (!currentDynamicOptions.has(occasionValue) && !defaultOptions.includes(occasionValue)) {
             const option = document.createElement('option');
@@ -247,11 +262,9 @@ function populateOccasionFilter() {
         }
     });
     
-    // 3. Vrátíme původně vybranou hodnotu (pokud stále existuje)
     if (Array.from(occasionFilter.options).some(o => o.value === currentSelectedValue)) {
         occasionFilter.value = currentSelectedValue;
     } else {
-        // Pokud vybraná příležitost zmizela (např. dárek byl smazán), vrátíme na "Vše"
         occasionFilter.value = 'all';
     }
 }
@@ -260,7 +273,6 @@ function populateOccasionFilter() {
  * Vykreslí dárky na základě aktuálně zvoleného filtru a rozdělí je
  */
 function renderFilteredGifts() {
-    // Vyprázníme kontejnery
     giftsHanickaContainer.innerHTML = '';
     giftsOliverContainer.innerHTML = '';
     giftsOtherContainer.innerHTML = '';
@@ -275,13 +287,10 @@ function renderFilteredGifts() {
          giftsHanickaSection.classList.add('hidden');
          giftsOliverSection.classList.add('hidden');
          giftsOtherSection.classList.add('hidden');
-         
-         // Místo mazání wrapperu jen zobrazíme zprávu
          filterNoResultsMsg.classList.remove('hidden');
          return;
     }
     
-    // Skryjeme zprávu o prázdném filtru, protože máme výsledky
     filterNoResultsMsg.classList.add('hidden');
 
     const gifts = { hanicka: [], oliver: [], other: [] };
@@ -297,7 +306,6 @@ function renderFilteredGifts() {
         }
     });
 
-    // Vykreslíme dárky a zobrazíme sekce, jen pokud nejsou prázdné
     if (gifts.hanicka.length > 0) {
         gifts.hanicka.forEach(gift => renderGift(gift, giftsHanickaContainer));
         giftsHanickaSection.classList.remove('hidden');
@@ -329,13 +337,26 @@ function renderGift(gift, container) {
     card.className = "bg-white p-5 rounded-lg border border-slate-200 shadow-sm";
     
     let statusHTML = '';
+    let editOccasionBtn = '';
+    let adminResetBtn = '';
+
+    // Tlačítko pro úpravu příležitosti (pro toho, kdo rezervoval)
+    if (isSoloClaimer || (isContributor && (gift.status === 'group-open' || gift.status === 'claimed-group'))) {
+        editOccasionBtn = `<button data-id="${gift.id}" data-action="edit-occasion" class="edit-occasion-btn ml-2 text-xs text-slate-500 hover:text-indigo-600" title="Upravit příležitost">✏️</button>`;
+    }
+    
+    // Tlačítko pro reset (pouze pro admina a pokud dárek není volný)
+    if (isAdmin && gift.status !== 'available') {
+         adminResetBtn = `<button data-id="${gift.id}" class="admin-reset-btn mt-2 px-3 py-1 bg-red-600 text-white text-xs font-semibold rounded-md hover:bg-red-700 w-full text-center">Resetovat (Admin)</button>`;
+    }
+
     switch(gift.status) {
         case 'available':
             statusHTML = `
                 <p class="text-sm text-green-600 font-semibold mb-3">Dostupné</p>
                 <div class="flex flex-col sm:flex-row gap-2">
-                    <button data-id="${gift.id}" class="claim-solo-btn px-3 py-1 bg-indigo-500 text-white text-sm rounded-md hover:bg-indigo-600">Koupím sám/a</button>
-                    <button data-id="${gift.id}" class="create-group-btn px-3 py-1 bg-slate-500 text-white text-sm rounded-md hover:bg-slate-600">Chci se složit</button>
+                    <button data-id="${gift.id}" data-action="claim-solo" class="claim-solo-btn px-3 py-1 bg-indigo-500 text-white text-sm rounded-md hover:bg-indigo-600">Koupím sám/a</button>
+                    <button data-id="${gift.id}" data-action="create-group" class="create-group-btn px-3 py-1 bg-slate-500 text-white text-sm rounded-md hover:bg-slate-600">Chci se složit</button>
                 </div>`;
             break;
         case 'group-open':
@@ -343,8 +364,11 @@ function renderGift(gift, container) {
             if (!isContributor) {
                 statusHTML += `<button data-id="${gift.id}" class="join-group-btn px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600">Přidat se</button>`;
             } else {
-                // Tlačítko pro opuštění skupiny
-                statusHTML += `<button data-id="${gift.id}" class="leave-group-btn px-3 py-1 bg-slate-500 text-white text-sm rounded-md hover:bg-slate-600">Odejít ze skupiny</button>`;
+                statusHTML += `
+                    <div class="space-y-2">
+                        <button data-id="${gift.id}" class="leave-group-btn px-3 py-1 bg-slate-500 text-white text-sm rounded-md hover:bg-slate-600 w-full">Odejít ze skupiny</button>
+                        <button data-id="${gift.id}" class="finalize-group-btn px-3 py-1 bg-green-500 text-white text-sm rounded-md hover:bg-green-600 w-full">Uzavřít (domluveno)</button>
+                    </div>`;
             }
             break;
         case 'claimed-solo':
@@ -360,35 +384,45 @@ function renderGift(gift, container) {
             }
             break;
         case 'claimed-group':
-            statusHTML = `<p class="text-sm text-slate-500 font-semibold mb-3">Zarezervováno (skupina)</p>`;
+             statusHTML = `<p class="text-sm text-green-700 font-semibold mb-3">Zajištěno skupinou (${gift.contributors?.length || 0})</p>`;
+             if (isContributor) {
+                 statusHTML += `<p class="text-xs text-slate-500 mb-2">(jste členem)</p>`;
+             }
             break;
     }
+    
+    // Přidáme admin resetovací tlačítko, pokud je definováno
+    statusHTML += adminResetBtn;
 
     let chatHTML = '';
-    if (isContributor) {
+    if (isContributor && (gift.status === 'group-open' || gift.status === 'claimed-group')) {
         chatHTML = `
             <div class="mt-4 pt-4 border-t border-slate-200">
                 <h4 class="font-semibold text-sm mb-2">Domluva ve skupině:</h4>
                 <div id="chat-${gift.id}" class="space-y-2 text-sm max-h-40 overflow-y-auto pr-2"></div>
+                ${gift.status === 'group-open' ? `
                 <form class="chat-form flex gap-2 mt-3">
                     <input type="text" placeholder="Napsat zprávu..." class="flex-grow border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" required>
                     <button type="submit" data-id="${gift.id}" class="px-3 py-1 bg-indigo-500 text-white text-sm rounded-md hover:bg-indigo-600">Odeslat</button>
-                </form>
+                </form>` : '<p class="text-sm text-slate-500 italic mt-2">Skupina je uzavřená, chat je pouze ke čtení.</p>'}
             </div>
         `;
         listenForChatMessages(gift.id);
     }
+    
+    // NOVĚ: Odkaz na dárek
+    const linkHTML = gift.link ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Odkaz na dárek</a>` : '';
 
     card.innerHTML = `
         <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div class="flex-grow">
                 <h3 class="text-lg font-bold">${gift.name}</h3>
                 ${gift.recipient ? `<p class="text-sm font-medium text-slate-600">Pro: ${gift.recipient}</p>` : ''}
-                <p class="text-sm text-slate-500 mb-2">Příležitost: ${gift.occasion}</p>
+                <p class="text-sm text-slate-500 mb-2">Příležitost: ${gift.occasion} ${editOccasionBtn}</p>
                 <p class="text-slate-700">${linkify(gift.description)}</p>
-                ${gift.link ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Přejít na web dárku</a>` : ''}
+                ${linkHTML}
             </div>
-            <div class="text-left sm:text-right flex-shrink-0">
+            <div class="text-left sm:text-right flex-shrink-0 w-full sm:w-auto sm:min-w-[150px]">
                 ${statusHTML}
             </div>
         </div>
@@ -420,7 +454,9 @@ function listenForChatMessages(giftId) {
 
             let actionsHTML = '';
             // Tlačítka pro editaci a mazání (tento HTML je bezpečný, je generovaný námi)
-            if (isMyMessage) {
+            // Zobrazíme je, jen pokud je skupina otevřená
+            const gift = allGifts.find(g => g.id === giftId);
+            if (isMyMessage && gift && gift.status === 'group-open') {
                 actionsHTML = `
                     <div class="flex items-center gap-2 flex-shrink-0">
                         <button class="edit-comment-btn text-xs text-slate-500 hover:text-indigo-600" title="Upravit">✏️</button>
@@ -430,45 +466,105 @@ function listenForChatMessages(giftId) {
             }
 
             // --- BEZPEČNÁ ČÁST (místo msgEl.innerHTML) ---
-            
-            // 1. Vytvoříme div pro obsah
             const contentEl = document.createElement('div');
             contentEl.className = 'message-content';
-
-            // 2. Vytvoříme odstavec <p>
             const pEl = document.createElement('p');
-            
-            // 3. Vytvoříme <strong> pro jméno odesílatele
             const strongEl = document.createElement('strong');
             strongEl.className = fontWeight;
             strongEl.textContent = sender + ':'; // BEZPEČNÉ vložení jména
-            
-            // 4. Vytvoříme <span> pro text zprávy
             const spanEl = document.createElement('span');
             spanEl.className = 'message-text';
             spanEl.textContent = ' ' + msg.message; // BEZPEČNÉ vložení zprávy (s mezerou)
 
-            // 5. Sestavíme to dohromady
             pEl.appendChild(strongEl);
             pEl.appendChild(spanEl);
             contentEl.appendChild(pEl);
-
-            // 6. Přidáme bezpečný obsah do elementu zprávy
             msgEl.appendChild(contentEl);
-            
-            // 7. Přidáme naše bezpečná tlačítka
             msgEl.insertAdjacentHTML('beforeend', actionsHTML);
             // --- KONEC BEZPEČNÉ ČÁSTI ---
 
             chatContainer.appendChild(msgEl);
         });
         
-        // Scroll to bottom
         if (chatContainer.scrollHeight > chatContainer.clientHeight) {
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
     });
 }
+
+
+// --- NOVÉ: Funkce pro modální okno ---
+function openReservationModal(giftId, action) {
+    const gift = allGifts.find(g => g.id === giftId);
+    if (!gift) return;
+
+    currentModalAction = { id: giftId, action: action };
+    
+    if (action === 'edit-occasion') {
+        modalTitle.textContent = "Upravit příležitost";
+    } else {
+        modalTitle.textContent = "Rezervovat dárek";
+    }
+    
+    modalGiftName.textContent = gift.name;
+    modalOccasion.value = gift.occasion;
+    reservationModal.classList.remove('hidden');
+    modalOccasion.focus();
+}
+
+// Zavření modálu
+modalCancelBtn.addEventListener('click', () => reservationModal.classList.add('hidden'));
+reservationModal.addEventListener('click', (e) => {
+    // Zavře modal jen pokud se klikne na pozadí (ne na obsah)
+    if (e.target === reservationModal) {
+        reservationModal.classList.add('hidden');
+    }
+});
+
+// Potvrzení modálu
+modalConfirmBtn.addEventListener('click', async () => {
+    const { id, action } = currentModalAction;
+    if (!id || !action) return;
+
+    const newOccasion = modalOccasion.value.trim();
+    if (!newOccasion) {
+        alert("Příležitost nesmí být prázdná.");
+        return;
+    }
+    
+    const giftRef = doc(db, 'gifts', id);
+    let updateData = {
+        occasion: newOccasion
+    };
+
+    try {
+        if (action === 'claim-solo') {
+            updateData = { 
+                ...updateData, 
+                status: 'claimed-solo', 
+                claimedBySolo: currentUser.uid, 
+                contributors: [], 
+                coordinator: null 
+            };
+        } else if (action === 'create-group') {
+             updateData = { 
+                ...updateData, 
+                status: 'group-open',
+                contributors: arrayUnion(currentUser.uid),
+                coordinator: currentUser.uid
+            };
+        }
+        // Pro 'edit-occasion' stačí jen `updateData = { occasion: newOccasion }`
+        
+        await updateDoc(giftRef, updateData);
+        reservationModal.classList.add('hidden');
+        currentModalAction = { id: null, action: null };
+        
+    } catch (err) {
+        console.error("Chyba při potvrzení modálu:", err);
+        alert("Došlo k chybě. Zkuste to znovu.");
+    }
+});
 
 
 // --- Event Listeners pro akce ---
@@ -478,52 +574,116 @@ occasionFilter.addEventListener('change', () => {
     renderFilteredGifts();
 });
 
+// --- NOVÉ: Listener pro Admin formulář ---
+if (addGiftForm) {
+    addGiftForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        addGiftLoader.classList.remove('hidden');
+        addGiftSubmitBtn.disabled = true;
+
+        const formData = new FormData(addGiftForm);
+        const newGift = {
+            name: formData.get('gift-name'),
+            recipient: formData.get('gift-recipient'),
+            occasion: formData.get('gift-occasion'),
+            description: formData.get('gift-description') || '',
+            link: formData.get('gift-link') || '',
+            // Výchozí stav
+            status: 'available',
+            claimedBySolo: null,
+            contributors: [],
+            coordinator: null
+        };
+
+        try {
+            await addDoc(collection(db, 'gifts'), newGift);
+            addGiftForm.reset();
+        } catch (err) {
+            console.error("Chyba při přidávání dárku:", err);
+            alert("Došlo k chybě při ukládání dárku.");
+        } finally {
+            addGiftLoader.classList.add('hidden');
+            addGiftSubmitBtn.disabled = false;
+        }
+    });
+}
+
 /**
- * *** OPRAVENÝ HLAVNÍ LISTENER ***
- * Rozdělil jsem logiku pro dárky a pro komentáře, aby si nepřekážely.
+ * *** AKTUALIZOVANÝ HLAVNÍ LISTENER ***
  */
 if (giftsWrapper) {
     giftsWrapper.addEventListener('click', async (e) => {
         const btn = e.target.closest('button');
         if (!btn || !currentUser) return;
 
-        const giftId = btn.dataset.id || btn.closest('.card')?.dataset.id || btn.closest('[data-id]')?.dataset.id;
-        
-        // 1. Logika pro AKCE S DÁRKY (Rezervace, opuštění skupiny atd.)
-        // Tyto třídy jsou jen na hlavních tlačítkách dárku
-        const isGiftAction = btn.matches('.claim-solo-btn, .create-group-btn, .join-group-btn, .cancel-solo-claim-btn, .leave-group-btn');
-        
-        if (isGiftAction) {
-            if (!giftId) return; // Nemáme ID dárku, nic neděláme
-            const giftRef = doc(db, 'gifts', giftId);
+        // Najdeme ID dárku z data atributu
+        const giftId = btn.dataset.id;
+        if (!giftId) return; // Není to tlačítko dárku
 
-            try {
-                if (btn.matches('.claim-solo-btn')) await updateDoc(giftRef, { status: 'claimed-solo', claimedBySolo: currentUser.uid, contributors: [], coordinator: null });
-                if (btn.matches('.create-group-btn')) await updateDoc(giftRef, { status: 'group-open', contributors: arrayUnion(currentUser.uid), coordinator: currentUser.uid });
-                if (btn.matches('.join-group-btn')) await updateDoc(giftRef, { contributors: arrayUnion(currentUser.uid) });
-                if (btn.matches('.cancel-solo-claim-btn')) await updateDoc(giftRef, { status: 'available', claimedBySolo: null });
-                
-                if (btn.matches('.leave-group-btn')) {
-                    if (confirm('Opravdu chcete odejít ze skupiny?')) {
-                        const giftDoc = await getDoc(giftRef);
-                        const currentContributors = giftDoc.data().contributors || [];
-                        
-                        if (currentContributors.length === 1 && currentContributors[0] === currentUser.uid) {
-                            await updateDoc(giftRef, { status: 'available', contributors: arrayRemove(currentUser.uid), coordinator: null });
-                        } else {
-                            await updateDoc(giftRef, { contributors: arrayRemove(currentUser.uid) });
-                            // TODO: Pokud odejde koordinátor, mohl by se jmenovat nový
-                        }
+        const giftRef = doc(db, 'gifts', giftId);
+
+        // 1. Akce otevírající modal
+        const modalAction = btn.dataset.action;
+        if (modalAction) {
+            openReservationModal(giftId, modalAction);
+            return;
+        }
+        
+        // 2. Přímé akce (bez modálu)
+        try {
+            // Přidat se ke skupině
+            if (btn.matches('.join-group-btn')) {
+                await updateDoc(giftRef, { contributors: arrayUnion(currentUser.uid) });
+            }
+            
+            // Zrušit sólo rezervaci
+            if (btn.matches('.cancel-solo-claim-btn')) {
+                await updateDoc(giftRef, { status: 'available', claimedBySolo: null });
+            }
+            
+            // Odejít ze skupiny
+            if (btn.matches('.leave-group-btn')) {
+                // Používáme confirm, dokud nemáme vlastní modal
+                if (confirm('Opravdu chcete odejít ze skupiny?')) {
+                    const giftDoc = await getDoc(giftRef);
+                    const currentContributors = giftDoc.data().contributors || [];
+                    
+                    if (currentContributors.length === 1 && currentContributors[0] === currentUser.uid) {
+                        // Poslední člen odchází -> vrátit na 'available'
+                        await updateDoc(giftRef, { status: 'available', contributors: arrayRemove(currentUser.uid), coordinator: null });
+                    } else {
+                        // Ještě tam někdo zbyl
+                        await updateDoc(giftRef, { contributors: arrayRemove(currentUser.uid) });
+                        // TODO: Pokud odejde koordinátor, mohl by se jmenovat nový
                     }
                 }
-            } catch (err) {
-                console.error("Chyba při rezervaci dárku:", err);
             }
-            return; // Po akci s dárkem skončíme
+            
+            // NOVÉ: Uzavřít skupinu
+            if (btn.matches('.finalize-group-btn')) {
+                if (confirm('Opravdu chcete skupinu označit za domluvenou? Chat bude poté uzamčen.')) {
+                    await updateDoc(giftRef, { status: 'claimed-group' });
+                }
+            }
+            
+            // NOVÉ: Admin reset
+            if (btn.matches('.admin-reset-btn')) {
+                 if (confirm('ADMIN: Opravdu chcete tuto rezervaci zrušit a vrátit dárek na "Dostupné"?')) {
+                    await updateDoc(giftRef, { 
+                        status: 'available', 
+                        claimedBySolo: null, 
+                        contributors: [], 
+                        coordinator: null 
+                    });
+                 }
+            }
+
+        } catch (err) {
+            console.error("Chyba při akci s dárkem:", err);
+            alert("Došlo k chybě.");
         }
 
-        // 2. Logika pro AKCE S KOMENTÁŘI (Editace, mazání)
-        // Tyto třídy jsou jen u komentářů
+        // 3. Logika pro AKCE S KOMENTÁŘI (Editace, mazání)
         const msgEl = btn.closest('.chat-message');
         if (msgEl) {
             const msgId = msgEl.dataset.msgId;
@@ -537,42 +697,35 @@ if (giftsWrapper) {
                     await deleteDoc(msgRef);
                 }
                 
-                // --- ZAČÁTEK BEZPEČNÉ ČÁSTI PRO EDITACI ---
+                // --- BEZPEČNÁ ČÁST PRO EDITACI (zůstává) ---
                 if (btn.matches('.edit-comment-btn')) {
                     const contentEl = msgEl.querySelector('.message-content');
-                    // .trim() odebere mezeru, kterou jsem přidal v listenForChatMessages
                     const originalText = contentEl.querySelector('.message-text').textContent.trim();
-                    contentEl.style.display = 'none'; // Skryjeme původní text
-                    btn.parentElement.style.display = 'none'; // Skryjeme tlačítka
+                    contentEl.style.display = 'none';
+                    btn.parentElement.style.display = 'none';
 
                     const editForm = document.createElement('form');
                     editForm.className = 'edit-comment-form flex-grow flex gap-2';
 
-                    // 1. Vytvoříme input
                     const inputEl = document.createElement('input');
                     inputEl.type = 'text';
-                    inputEl.value = originalText; // BEZPEČNÉ vložení textu do HODNOTY
+                    inputEl.value = originalText;
                     inputEl.className = 'flex-grow border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500';
                     inputEl.required = true;
 
-                    // 2. Vytvoříme tlačítko Uložit
                     const saveBtn = document.createElement('button');
                     saveBtn.type = 'submit';
                     saveBtn.className = 'px-2 py-1 bg-green-500 text-white text-xs rounded-md hover:bg-green-600';
                     saveBtn.textContent = 'Uložit';
 
-                    // 3. Vytvoříme tlačítko Zrušit
                     const cancelBtn = document.createElement('button');
                     cancelBtn.type = 'button';
                     cancelBtn.className = 'cancel-edit-btn px-2 py-1 bg-slate-200 text-slate-700 text-xs rounded-md hover:bg-slate-300';
                     cancelBtn.textContent = 'Zrušit';
 
-                    // 4. Sestavíme formulář
                     editForm.appendChild(inputEl);
                     editForm.appendChild(saveBtn);
                     editForm.appendChild(cancelBtn);
-                    
-                    // 5. Přidáme formulář do elementu zprávy
                     msgEl.appendChild(editForm);
                 }
                 // --- KONEC BEZPEČNÉ ČÁSTI PRO EDITACI ---
