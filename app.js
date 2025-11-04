@@ -22,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 // POZOR: Vlož sem svůj reCAPTCHA Site Key, který jsi získal
 try {
     const appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider('TVUJ_RECAPTCHA_SITE_KEY'), // <-- VLOŽ KLÍČ SEM
+      provider: new ReCaptchaV3Provider('6LfDTQIsAAAAANXqps6CUrdaWyDH2_u72xvur-V8'), // <-- VLOŽ KLÍČ SEM
       isTokenAutoRefreshEnabled: true
     });
     console.log("Firebase App Check inicializován.");
@@ -55,6 +55,7 @@ const giftsOtherContainer = document.getElementById('gifts-other-container');
 // Filtr
 const filterContainer = document.getElementById('filter-container');
 const occasionFilter = document.getElementById('occasion-filter');
+const personFilter = document.getElementById('person-filter'); // <-- NOVÁ REFERENCE
 
 // Zprávy
 const filterNoResultsMsg = document.getElementById('filter-no-results-msg');
@@ -85,12 +86,11 @@ let allGifts = [];
 let currentModalAction = { id: null, action: null }; 
 let currentEditGiftId = null; 
 
-// *** NOVÉ: Mapa pro chytré filtrování ***
+// Mapa pro chytré filtrování
 const occasionCategoryMap = {
     'Vánoce': ['vanoce', 'vánoce', 'vianoce'],
     'Narozeniny': ['narozeniny', 'narodeniny'],
     'Svátek': ['svátek', 'svatek', 'meniny']
-    // Zde můžeš přidat další hlavní kategorie a jejich mutace
 };
 // Klíče z mapy, které mají být ve filtru (plus 'all')
 const staticFilterOptions = ['all', ...Object.keys(occasionCategoryMap)];
@@ -149,7 +149,7 @@ function resetAdminForm() {
     adminFormTitle.textContent = 'Panel administrátora';
     addGiftSubmitBtn.textContent = 'Přidat dárek';
     cancelEditBtn.classList.add('hidden');
-    giftIsContributionCheckbox.checked = false; // Reset checkboxu
+    giftIsContributionCheckbox.checked = false; 
     currentEditGiftId = null;
 }
 
@@ -246,8 +246,9 @@ function listenForGifts() {
 
         giftsEmptyDbMsg.classList.add('hidden');
         filterContainer.classList.remove('hidden');
-        populateOccasionFilter(); // ZAVOLÁ UPRAVENOU FUNKCI
-        renderFilteredGifts(); // ZAVOLÁ UPRAVENOU FUNKCI
+        filterContainer.classList.add('flex'); // Zajistí zobrazení
+        populateOccasionFilter(); 
+        renderFilteredGifts();
 
     }, error => {
         console.error("Chyba při načítání dárků:", error);
@@ -259,21 +260,17 @@ function listenForGifts() {
 }
 
 /**
- * *** UPRAVENO: Funkce pro statický filtr ***
- * Odstraní z filtru všechny "spam" položky (např. Vánoce 2025).
+ * Funkce pro statický filtr
  */
 function populateOccasionFilter() {
     const currentSelectedValue = occasionFilter.value;
     
-    // Projdeme všechny <option> ve filtru
     Array.from(occasionFilter.options).forEach(option => {
-        // Pokud hodnota <option> NENÍ v našem seznamu povolených, smažeme ji
         if (!staticFilterOptions.includes(option.value)) {
             option.remove();
         }
     });
     
-    // Zkontrolujeme, zda vybraná hodnota stále existuje, jinak resetujeme na "all"
     if (Array.from(occasionFilter.options).some(o => o.value === currentSelectedValue)) {
         occasionFilter.value = currentSelectedValue;
     } else {
@@ -283,35 +280,37 @@ function populateOccasionFilter() {
 
 
 /**
- * *** UPRAVENO: Funkce pro chytré filtrování ***
- * Používá occasionCategoryMap k nalezení všech mutací.
+ * *** UPRAVENO: Funkce pro chytré filtrování (oběma filtry) ***
  */
 function renderFilteredGifts() {
     giftsHanickaContainer.innerHTML = '';
     giftsOliverContainer.innerHTML = '';
     giftsOtherContainer.innerHTML = '';
 
+    // Získáme hodnoty z OBOU filtrů
     const selectedOccasion = occasionFilter.value;
+    const selectedPerson = personFilter.value; // <-- NOVÉ
     
     const filteredGifts = allGifts.filter(gift => {
-        // Vždy zobrazit vše, pokud je vybráno "all"
-        if (selectedOccasion === 'all') return true;
-        // Přeskočit dárky, které nemají příležitost nastavenou
-        if (!gift.occasion) return false;
-
-        // Získáme seznam mutací pro vybranou kategorii (např. ['vanoce', 'vánoce', 'vianoce'])
-        const mutations = occasionCategoryMap[selectedOccasion];
-
-        // Pokud kategorie není v naší mapě, vrátíme se k jednoduchému porovnání
-        if (!mutations) {
-             return gift.occasion.toLowerCase().startsWith(selectedOccasion.toLowerCase());
+        // --- Shoda příležitosti (chytrá logika) ---
+        let occasionMatch = false;
+        if (selectedOccasion === 'all') {
+            occasionMatch = true;
+        } else if (gift.occasion) {
+            const mutations = occasionCategoryMap[selectedOccasion];
+            const giftOccasionLower = gift.occasion.toLowerCase();
+            if (mutations) {
+                occasionMatch = mutations.some(prefix => giftOccasionLower.startsWith(prefix));
+            } else {
+                occasionMatch = giftOccasionLower.startsWith(selectedOccasion.toLowerCase());
+            }
         }
 
-        // Převedeme příležitost dárku na malá písmena pro porovnání
-        const giftOccasionLower = gift.occasion.toLowerCase();
+        // --- Shoda osoby (jednoduchá logika) ---
+        const personMatch = (selectedPerson === 'all') || (gift.recipient === selectedPerson); // <-- NOVÉ
 
-        // Zjistíme, jestli příležitost dárku začíná na NĚKTEROU z našich mutací
-        return mutations.some(prefix => giftOccasionLower.startsWith(prefix));
+        // --- Výsledek: Musí platit OBĚ ---
+        return occasionMatch && personMatch;
     });
 
     if (filteredGifts.length === 0) {
@@ -573,9 +572,16 @@ modalConfirmBtn.addEventListener('click', async () => {
 
 // --- Event Listeners pro akce ---
 
+// Listener pro změnu filtru příležitosti
 occasionFilter.addEventListener('change', () => {
     renderFilteredGifts();
 });
+
+// *** NOVÝ Listener pro změnu filtru osob ***
+personFilter.addEventListener('change', () => {
+    renderFilteredGifts();
+});
+
 
 // Listener pro zrušení úprav v admin formuláři
 if (cancelEditBtn) {
@@ -828,4 +834,3 @@ if (giftsWrapper) {
 } else {
     console.error("Kritická chyba: Element 'gifts-wrapper' nebyl nalezen. Ujistěte se, že používáte správný index.html.");
 }
-
