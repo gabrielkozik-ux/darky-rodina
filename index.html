@@ -142,14 +142,26 @@
                 <p>Váš účet nyní čeká na schválení administrátorem. Jakmile bude účet aktivní, uvidíte zde seznam dárků.</p>
             </div>
 
-            <div id="filter-container" class="mb-6 hidden">
-                <label for="occasion-filter" class="block text-sm font-medium text-slate-700 mb-1">Filtrovat podle příležitosti:</label>
-                <select id="occasion-filter" class="w-full max-w-xs rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="all">Všechny příležitosti</option>
-                    <option value="Narozeniny">Narozeniny</option>
-                    <option value="Vánoce">Vánoce</option>
-                    <option value="Svátek">Svátek</option>
+           <div id="filter-container" class="flex flex-col sm:flex-row gap-4 mb-6 hidden">
+                <div>
+                    <label for="occasion-filter" class="block text-sm font-medium text-slate-700 mb-1">Filtrovat podle příležitosti:</label>
+                    <select id="occasion-filter" class="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="all">Všechny příležitosti</option>
+                        <option value="Narozeniny">Narozeniny</option>
+                        <option value="Vánoce">Vánoce</option>
+                        <option value="Svátek">Svátek</option>
                     </select>
+                </div>
+
+                <div>
+                    <label for="person-filter" class="block text-sm font-medium text-slate-700 mb-1">Filtrovat podle osoby:</label>
+                    <select id="person-filter" class="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="all">Všechny osoby</option>
+                        <option value="Hanička">Hanička</option>
+                        <option value="Oliver">Oliver</option>
+                        <option value="Ostatní">Ostatní</option>
+                    </select>
+                </div>
             </div>
 
             <div id="loader" class="hidden justify-center items-center py-16">
