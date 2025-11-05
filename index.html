@@ -11,6 +11,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Animace pro načítání */
         @keyframes spin { to { transform: rotate(360deg); } }
         .loader {
             border: 4px solid rgba(0, 0, 0, .1);
@@ -20,19 +21,22 @@
             height: 40px;
             animation: spin 1s linear infinite;
         }
+        
+        /* Zobrazení modálu */
         .modal.hidden { display: none; }
         .modal { display: flex; }
 
+        /* Styly pro panel instrukcí (akordeon) */
         details summary::-webkit-details-marker { display: none; }
         details summary::after {
             content: '▼';
             font-size: 0.9em;
-            color: #4f46e5; 
+            color: #4f46e5; /* indigo-600 */
             transition: transform 0.2s ease-in-out;
         }
         details[open] summary::after { transform: rotate(180deg); }
 
-        /* ===== NOVÝ STYL PRO NÁHLED OBRÁZKU ===== */
+        /* Styl pro náhled obrázku v admin panelu */
         #gift-image-preview {
             max-height: 150px;
             width: auto;
@@ -48,20 +52,75 @@
     <div class="container mx-auto max-w-4xl p-4 md:p-8">
 
         <header class="flex justify-between items-center mb-8 pb-4 border-b border-slate-200">
-            <!-- ... (obsah headeru zůstává stejný) ... -->
+            <h1 class="text-3xl font-bold text-slate-900">Seznam přání</h1>
+            <div id="auth-container">
+                <button id="loginBtn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                    Přihlásit se přes Google
+                </button>
+                <div id="user-info" class="hidden items-center gap-4">
+                    <p class="text-sm">Přihlášen/a: <span id="user-name" class="font-semibold"></span></p>
+                    <button id="logoutBtn" class="px-3 py-1 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300">
+                        Odhlásit
+                    </button>
+                </div>
+            </div>
         </header>
 
         <section id="instructions-panel" class="mb-8 bg-white border border-slate-200 rounded-lg shadow-sm">
-            <!-- ... (obsah instrukcí zůstává stejný) ... -->
+            <details>
+                <summary class="flex justify-between items-center p-4 cursor-pointer">
+                    <h2 class="text-lg font-semibold text-slate-700">Jak to funguje? (Klikněte pro zobrazení)</h2>
+                </summary>
+                <div class="p-4 border-t border-slate-200 text-slate-600 space-y-3">
+                    <p>Vítejte! Tato stránka slouží ke koordinaci dárků pro děti, abychom se vyhnuli tomu, že se sejde stejný dárek dvakrát.</p>
+                    
+                    <h4 class="font-semibold text-slate-700 pt-2">Jak rezervovat dárek:</h4>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><strong>Koupím sám/a:</strong> Tímto dárek zarezervujete jen pro sebe. Ostatní uvidí, že je "Zarezervováno".</li>
+                        <li><strong>Chci se složit:</strong> Tímto založíte skupinu. Ostatní se mohou přidat tlačítkem "Přidat se".</li>
+                        <li><strong>Chci přispět:</strong> U finančních příspěvků. Koupí se nic nerezervuje, pouze se přihlásíte k příspěvku.</li>
+                    </ul>
+                    
+                    <h4 class="font-semibold text-slate-700 pt-2">Domluva ve skupině:</h4>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>Jakmile se přidáte do skupiny (nebo přispějete), odemkne se vám v kartě dárku **chat pro domluvu**.</li>
+                        <li>Kdokoliv ze skupiny může chat upravovat nebo mazat své komentáře.</li>
+                        <li>Až bude dárek koupený a domluveno, klikněte na **"Uzavřít (domluveno)"**. Tím se chat uzamkne a dárek se označí jako finálně zajištěný.</li>
+                    </ul>
+                </div>
+            </details>
         </section>
 
         <main id="app-content">
-            <!-- ===== ADMINISTRAČNÍ PANEL ===== -->
             <section id="admin-panel" class="hidden mb-8 p-6 bg-white border border-indigo-200 rounded-lg shadow-md">
                 <h2 id="admin-form-title" class="text-xl font-bold text-indigo-700 mb-4">Panel administrátora</h2>
                 <form id="add-gift-form" class="space-y-4">
-                    <!-- ... (pole Jméno, Pro koho, Příležitost, Checkbox zůstávají stejná) ... -->
-                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="gift-name" class="block text-sm font-medium text-slate-700">Název dárku</label>
+                            <input type="text" id="gift-name" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                        </div>
+                        <div>
+                            <label for="gift-recipient" class="block text-sm font-medium text-slate-700">Pro koho</label>
+                            <select id="gift-recipient" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                <option value="Hanička">Hanička</option>
+                                <option value="Oliver">Oliver</option>
+                                <option value="Ostatní">Ostatní</option>
+                            </select>
+                        </div>
+                    </div>
+                     <div>
+                        <label for="gift-occasion" class="block text-sm font-medium text-slate-700">Příležitost (např. Vánoce 2025)</label>
+                        <input type="text" id="gift-occasion" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                    </div>
+
+                    <div class="pt-2">
+                        <div class="flex items-center">
+                            <input id="gift-is-contribution" name="gift-is-contribution" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <label for="gift-is-contribution" class="ml-3 block text-sm font-medium text-slate-700">Toto je finanční příspěvek (dárek koupí rodiče)</label>
+                        </div>
+                    </div>
+
                     <div>
                         <label for="gift-description" class="block text-sm font-medium text-slate-700">Popis</label>
                         <textarea id="gift-description" rows="3" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
@@ -71,7 +130,6 @@
                         <input type="url" id="gift-link" placeholder="https://www.eshop.cz/..." class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     </div>
 
-                    <!-- ===== NOVÉ POLE PRO NAHRÁNÍ OBRÁZKU ===== -->
                     <div>
                         <label for="gift-image" class="block text-sm font-medium text-slate-700">Obrázek dárku (volitelné)</label>
                         <input type="file" id="gift-image" accept="image/png, image/jpeg, image/webp" class="mt-1 block w-full text-sm text-slate-500
@@ -83,7 +141,6 @@
                         ">
                         <img id="gift-image-preview" src="" alt="Náhled" class="mt-4 hidden">
                     </div>
-                    <!-- ========================================= -->
 
                     <div class="flex items-center gap-4">
                         <button type="submit" id="add-gift-submit" class="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
@@ -96,14 +153,90 @@
                     </div>
                 </form>
             </section>
-            <!-- ===================================== -->
 
-            <!-- ... (zbytek HTML je stejný - pending-approval, filtry, kontejnery dárků, modal) ... -->
+            <div id="pending-approval-msg" class="hidden p-4 bg-yellow-100 border border-yellow-300 text-yellow-800 rounded-lg">
+                <h2 class="font-bold">Děkujeme za registraci!</h2>
+                <p>Váš účet nyní čeká na schválení administrátorem. Jakmile bude účet aktivní, uvidíte zde seznam dárků.</p>
+            </div>
 
+            <div id="filter-container" class="flex flex-col sm:flex-row gap-4 mb-6 hidden">
+                <div>
+                    <label for="occasion-filter" class="block text-sm font-medium text-slate-700 mb-1">Filtrovat podle příležitosti:</label>
+                    <select id="occasion-filter" class="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="all">Všechny příležitosti</option>
+                        <option value="Narozeniny">Narozeniny</option>
+                        <option value="Vánoce">Vánoce</option>
+                        <option value="Svátek">Svátek</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="person-filter" class="block text-sm font-medium text-slate-700 mb-1">Filtrovat podle osoby:</label>
+                    <select id="person-filter" class="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="all">Všechny osoby</option>
+                        <option value="Hanička">Hanička</option>
+                        <option value="Oliver">Oliver</option>
+                        <option value="Ostatní">Ostatní</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="loader" class="hidden justify-center items-center py-16">
+                <div class="loader"></div>
+            </div>
+            
+            <div id="gifts-wrapper">
+                <div id="gifts-empty-db-msg" class="hidden text-center text-slate-500 p-4">
+                    <p>Zatím tu nejsou žádné nápady na dárky.</p>
+                </div>
+                <div id="filter-no-results-msg" class="hidden text-center text-slate-500 p-4">
+                    <p>Žádné dárky neodpovídají zvolenému filtru.</p>
+                </div>
+                <section id="gifts-hanicka-section" class="mb-8 hidden">
+                    <h2 class="text-2xl font-bold text-indigo-700 mb-4 pb-2 border-b border-indigo-200">Pro Haničku</h2>
+                    <div id="gifts-hanicka-container" class="space-y-4"></div>
+                </section>
+                
+                <section id="gifts-oliver-section" class="mb-8 hidden">
+                    <h2 class="text-2xl font-bold text-teal-700 mb-4 pb-2 border-b border-teal-200">Pro Olivera</h2>
+                    <div id="gifts-oliver-container" class="space-y-4"></div>
+                </section>
+
+                <section id="gifts-other-section" class="mb-8 hidden">
+                     <h2 class="text-2xl font-bold text-slate-700 mb-4 pb-2 border-b border-slate-200">Ostatní / Neurčeno</h2>
+                    <div id="gifts-other-container" class="space-y-4"></div>
+                </section>
+            </div>
+
+            <div id="welcome-msg" class="p-8 bg-white border border-slate-200 rounded-lg text-center">
+                <h2 class="text-2xl font-bold mb-2">Vítejte!</h2>
+                <p class="text-slate-600">Pro zobrazení seznamu dárků se prosím přihlaste pomocí svého Google účtu.</p>
+            </div>
         </main>
     </div>
 
-    <!-- ... (Modal okno zůstává stejné) ... -->
+    <div id="reservation-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h3 id="modal-title" class="text-lg font-bold mb-4">Rezervovat dárek</h3>
+            <p class="mb-2">Potvrzujete rezervaci pro dárek:</p>
+            <p id="modal-gift-name" class="font-semibold text-lg text-indigo-700 mb-4"></p>
+            
+            <div>
+                <label for="modal-occasion" class="block text-sm font-medium text-slate-700">Příležitost</label>
+                <input type="text" id="modal-occasion" class="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <p class="text-xs text-slate-500 mt-1">Můžete upravit, např. "Narozeniny" místo "Vánoce".</p>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-300">
+                    Zrušit
+                </button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700">
+                    Potvrdit
+                </button>
+            </div>
+        </div>
+    </div>
 
    <script type="module" src="app.js"></script>
 </body>
