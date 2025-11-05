@@ -37,8 +37,37 @@ const storage = getStorage(app);
 // --- Reference na HTML Elementy -------------------------------------------
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
-// ... (ostatní reference)
+const userInfo = document.getElementById('user-info');
+const userNameEl = document.getElementById('user-name');
+const welcomeMsg = document.getElementById('welcome-msg');
+const pendingApprovalMsg = document.getElementById('pending-approval-msg');
+const loader = document.getElementById('loader');
+
+// Kontejnery dárků
+const giftsWrapper = document.getElementById('gifts-wrapper');
+const giftsHanickaSection = document.getElementById('gifts-hanicka-section');
+const giftsHanickaContainer = document.getElementById('gifts-hanicka-container');
+const giftsOliverSection = document.getElementById('gifts-oliver-section');
+const giftsOliverContainer = document.getElementById('gifts-oliver-container');
+const giftsOtherSection = document.getElementById('gifts-other-section');
+const giftsOtherContainer = document.getElementById('gifts-other-container');
+
+// Filtr
+const filterContainer = document.getElementById('filter-container');
+const occasionFilter = document.getElementById('occasion-filter');
 const personFilter = document.getElementById('person-filter'); 
+
+// Zprávy
+const filterNoResultsMsg = document.getElementById('filter-no-results-msg');
+const giftsEmptyDbMsg = document.getElementById('gifts-empty-db-msg');
+
+// Admin Panel
+const adminPanel = document.getElementById('admin-panel');
+const adminFormTitle = document.getElementById('admin-form-title');
+const addGiftForm = document.getElementById('add-gift-form');
+const addGiftLoader = document.getElementById('add-gift-loader');
+const addGiftSubmitBtn = document.getElementById('add-gift-submit');
+const cancelEditBtn = document.getElementById('cancel-edit-btn');
 const giftIsContributionCheckbox = document.getElementById('gift-is-contribution'); 
 const giftImageInput = document.getElementById('gift-image'); 
 const giftImagePreview = document.getElementById('gift-image-preview'); 
@@ -51,7 +80,7 @@ const modalOccasion = document.getElementById('modal-occasion');
 const modalCancelBtn = document.getElementById('modal-cancel-btn');
 const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 
-// *** NOVÉ: Reference na Lightbox ***
+// Lightbox
 const imageLightbox = document.getElementById('image-lightbox');
 const lightboxImage = document.getElementById('lightbox-image');
 const lightboxClose = document.getElementById('lightbox-close');
@@ -74,11 +103,16 @@ const staticFilterOptions = ['all', ...Object.keys(occasionCategoryMap)];
 
 
 // --- Autentizace ---------------------------------------------------------
-// ... (celá sekce onAuthStateChanged zůstává stejná) ...
+loginBtn.addEventListener('click', () => {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider).catch(error => console.error("Chyba při přihlašování: ", error));
+});
+
+logoutBtn.addEventListener('click', () => signOut(auth));
+
 onAuthStateChanged(auth, user => {
     currentUser = user;
     if (user) {
-        // ... (kód pro přihlášeného uživatele)
         loginBtn.classList.add('hidden');
         userInfo.classList.remove('hidden');
         userInfo.classList.add('flex');
@@ -86,7 +120,6 @@ onAuthStateChanged(auth, user => {
         welcomeMsg.classList.add('hidden');
         checkUserRoleAndLoadGifts(user);
     } else {
-        // ... (kód pro odhlášeného uživatele)
         isAdmin = false;
         loginBtn.classList.remove('hidden');
         userInfo.classList.add('hidden');
@@ -110,10 +143,11 @@ onAuthStateChanged(auth, user => {
     }
 });
 
-
 // --- Logika Aplikace ----------------------------------------------------
-// ... (resetAdminForm, linkify, checkUserRoleAndLoadGifts, listenForGifts, populateOccasionFilter, renderFilteredGifts zůstávají stejné) ...
-// ...
+
+/**
+ * Funkce pro reset admin formuláře
+ */
 function resetAdminForm() {
     addGiftForm.reset();
     adminFormTitle.textContent = 'Panel administrátora';
@@ -127,6 +161,9 @@ function resetAdminForm() {
     giftImagePreview.src = '';
 }
 
+/**
+ * Funkce pro převod textu s URL na klikatelné odkazy
+ */
 function linkify(text) {
     if (!text) return '';
     const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
@@ -229,6 +266,9 @@ function listenForGifts() {
     });
 }
 
+/**
+ * Funkce pro statický filtr
+ */
 function populateOccasionFilter() {
     const currentSelectedValue = occasionFilter.value;
     
@@ -246,6 +286,9 @@ function populateOccasionFilter() {
 }
 
 
+/**
+ * Funkce pro chytré filtrování (oběma filtry)
+ */
 function renderFilteredGifts() {
     giftsHanickaContainer.innerHTML = '';
     giftsOliverContainer.innerHTML = '';
@@ -255,6 +298,7 @@ function renderFilteredGifts() {
     const selectedPerson = personFilter.value; 
     
     const filteredGifts = allGifts.filter(gift => {
+        // --- Shoda příležitosti (chytrá logika) ---
         let occasionMatch = false;
         if (selectedOccasion === 'all') {
             occasionMatch = true;
@@ -268,8 +312,10 @@ function renderFilteredGifts() {
             }
         }
 
+        // --- Shoda osoby (jednoduchá logika) ---
         const personMatch = (selectedPerson === 'all') || (gift.recipient === selectedPerson);
 
+        // --- Výsledek: Musí platit OBĚ ---
         return occasionMatch && personMatch;
     });
 
@@ -301,9 +347,9 @@ function renderFilteredGifts() {
     gifts.other.length > 0 ? (gifts.other.forEach(gift => renderGift(gift, giftsOtherContainer)), giftsOtherSection.classList.remove('hidden')) : giftsOtherSection.classList.add('hidden');
 }
 
+
 /**
- * *** UPRAVENO: renderGift ***
- * Přidána třída .gift-image-clickable pro obrázky.
+ * Funkce pro vykreslení jedné karty dárku
  */
 function renderGift(gift, container) {
     const isContributor = gift.contributors && gift.contributors.includes(currentUser.uid);
@@ -317,10 +363,10 @@ function renderGift(gift, container) {
     let editOccasionBtn = '';
     let adminControls = '';
 
-    // ... (logika pro editOccasionBtn a adminControls zůstává stejná) ...
     if (isSoloClaimer || isContributor) {
         editOccasionBtn = `<button data-id="${gift.id}" data-action="edit-occasion" class="edit-occasion-btn ml-2 text-xs text-slate-500 hover:text-indigo-600" title="Upravit příležitost">✏️</button>`;
     }
+    
     if (isAdmin) {
         let adminResetBtn = '';
         if (!isContributionGift && gift.status !== 'available') {
@@ -334,9 +380,9 @@ function renderGift(gift, container) {
             </div>
          `;
     }
-    
-    // --- (logika pro statusHTML, switch(gift.status) atd. zůstává stejná) ---
+
     if (isContributionGift) {
+        // --- Finanční příspěvek ---
         statusHTML = `<p class="text-sm text-blue-600 font-semibold mb-3">Finanční příspěvek (${gift.contributors?.length || 0})</p>`;
         if (!isContributor) {
             statusHTML += `<button data-id="${gift.id}" class="join-group-btn px-3 py-1 bg-blue-500 text-white text-sm rounded-md hover:bg-blue-600 w-full">Chci přispět</button>`;
@@ -344,6 +390,7 @@ function renderGift(gift, container) {
             statusHTML += `<button data-id="${gift.id}" class="leave-group-btn px-3 py-1 bg-slate-500 text-white text-sm rounded-md hover:bg-slate-600 w-full">Už nechci přispět</button>`;
         }
     } else {
+        // --- Běžné dárky ---
         switch(gift.status) {
             case 'available':
                 statusHTML = `
@@ -387,9 +434,9 @@ function renderGift(gift, container) {
     statusHTML += adminControls; 
 
     let chatHTML = '';
-    // ... (logika pro chatHTML zůstává stejná) ...
     if (isContributor && (isContributionGift || gift.status === 'group-open' || gift.status === 'claimed-group')) {
         const showChatForm = (isContributionGift || gift.status === 'group-open');
+        
         chatHTML = `
             <div class="mt-4 pt-4 border-t border-slate-200">
                 <h4 class="font-semibold text-sm mb-2">Domluva (${isContributionGift ? 'příspěvek' : 'skupina'}):</h4>
@@ -406,7 +453,6 @@ function renderGift(gift, container) {
     
     const linkHTML = (gift.link && !isContributionGift) ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Odkaz na dárek</a>` : '';
 
-    // *** UPRAVENO: Přidána třída .gift-image-clickable ***
     const imageHTML = gift.imageUrl ? `
         <div class="mt-4">
             <img src="${gift.imageUrl}" alt="${gift.name}" class="gift-image-clickable rounded-lg shadow-md w-full h-auto max-h-72 object-cover cursor-pointer transition-transform duration-200 hover:scale-105">
@@ -432,7 +478,10 @@ function renderGift(gift, container) {
     container.appendChild(card);
 }
 
-// ... (funkce listenForChatMessages zůstává stejná) ...
+/**
+ * *** OPRAVENO: Naslouchá zprávám v chatu ***
+ * Logika nyní správně zobrazuje tlačítka úprav i pro finanční příspěvky.
+ */
 function listenForChatMessages(giftId) {
     const chatQuery = query(collection(db, 'gifts', giftId, 'chat'), orderBy('timestamp'));
     onSnapshot(chatQuery, snapshot => {
@@ -452,6 +501,8 @@ function listenForChatMessages(giftId) {
 
             let actionsHTML = '';
             const gift = allGifts.find(g => g.id === giftId);
+            
+            // --- TOTO JE OPRAVENÁ PODMÍNKA ---
             if (isMyMessage && gift && (gift.status === 'group-open' || gift.giftType === 'contribution')) {
                 actionsHTML = `
                     <div class="flex items-center gap-2 flex-shrink-0">
@@ -460,6 +511,7 @@ function listenForChatMessages(giftId) {
                     </div>
                 `;
             }
+            // --- KONEC OPRAVY ---
 
             const contentEl = document.createElement('div');
             contentEl.className = 'message-content';
@@ -487,7 +539,6 @@ function listenForChatMessages(giftId) {
 
 
 // --- Funkce pro modální okno ---
-// ... (funkce openReservationModal a listenery pro modál zůstávají stejné) ...
 function openReservationModal(giftId, action) {
     const gift = allGifts.find(g => g.id === giftId);
     if (!gift) return;
@@ -539,19 +590,17 @@ modalConfirmBtn.addEventListener('click', async () => {
 });
 
 
-// --- NOVÉ: Listenery pro Lightbox ---
+// --- Listenery pro Lightbox ---
 if (imageLightbox) {
-    // Zavření kliknutím na 'x'
     lightboxClose.addEventListener('click', () => {
         imageLightbox.classList.add('hidden');
-        lightboxImage.src = ''; // Vyčistí obrázek
+        lightboxImage.src = ''; 
     });
     
-    // Zavření kliknutím na pozadí (mimo obrázek)
     imageLightbox.addEventListener('click', (e) => {
-        if (e.target === imageLightbox) { // Kliknuto na tmavé pozadí
+        if (e.target === imageLightbox) { 
             imageLightbox.classList.add('hidden');
-            lightboxImage.src = ''; // Vyčistí obrázek
+            lightboxImage.src = '';
         }
     });
 }
@@ -586,6 +635,7 @@ if (giftImageInput) {
 
 /**
  * Listener pro Admin formulář (Přidání/Úprava)
+ * *** OPRAVENO PRO .WEBP ***
  */
 if (addGiftForm) {
     addGiftForm.addEventListener('submit', async (e) => {
@@ -617,7 +667,8 @@ if (addGiftForm) {
                 if (file) {
                     const imagePath = `gifts/${currentEditGiftId}/${file.name}`;
                     const storageRef = ref(storage, imagePath);
-                    await uploadBytes(storageRef, file);
+                    const metadata = { contentType: file.type }; // <-- OPRAVA .WEBP
+                    await uploadBytes(storageRef, file, metadata); // <-- OPRAVA .WEBP
                     giftData.imageUrl = await getDownloadURL(storageRef);
                     giftData.imagePath = imagePath; 
 
@@ -644,7 +695,8 @@ if (addGiftForm) {
                 if (file) {
                     imagePath = `gifts/${giftId}/${file.name}`;
                     const storageRef = ref(storage, imagePath);
-                    await uploadBytes(storageRef, file);
+                    const metadata = { contentType: file.type }; // <-- OPRAVA .WEBP
+                    await uploadBytes(storageRef, file, metadata); // <-- OPRAVA .WEBP
                     imageUrl = await getDownloadURL(storageRef);
                 }
 
@@ -674,26 +726,24 @@ if (addGiftForm) {
 }
 
 /**
- * *** AKTUALIZOVANÝ HLAVNÍ LISTENER PRO AKCE NA KARTÁCH ***
- * Přidána logika pro otevírání lightboxu.
+ * Hlavní listener pro akce na kartách
  */
 if (giftsWrapper) {
     giftsWrapper.addEventListener('click', async (e) => {
-        if (!currentUser) return; // Kontrola hned na začátku
+        if (!currentUser) return;
 
-        // --- NOVÉ: Logika pro kliknutí na obrázek ---
+        // Logika pro kliknutí na obrázek (Lightbox)
         const clickedImage = e.target.closest('.gift-image-clickable');
         if (clickedImage) {
             e.preventDefault(); 
-            lightboxImage.src = clickedImage.src; // Načteme full-res
+            lightboxImage.src = clickedImage.src; 
             imageLightbox.classList.remove('hidden');
-            return; // Po otevření lightboxu skončíme
+            return; 
         }
-        // --- KONEC logiky pro obrázek ---
 
-        // --- Stávající logika pro tlačítka ---
+        // Logika pro tlačítka
         const btn = e.target.closest('button');
-        if (!btn) return; // Není to tlačítko, skončíme
+        if (!btn) return;
 
         const giftId = btn.dataset.id;
         if (!giftId) return;
