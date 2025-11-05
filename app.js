@@ -34,7 +34,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// --- ===== TATO ČÁST CHYBĚLA (Reference na HTML Elementy) ===== ---
+// --- Reference na HTML Elementy -------------------------------------------
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const userInfo = document.getElementById('user-info');
@@ -84,7 +84,6 @@ const modalConfirmBtn = document.getElementById('modal-confirm-btn');
 const imageLightbox = document.getElementById('image-lightbox');
 const lightboxImage = document.getElementById('lightbox-image');
 const lightboxClose = document.getElementById('lightbox-close');
-// --- ========================================================== ---
 
 
 // --- Globální proměnné ----------------------------------------------------
@@ -299,11 +298,9 @@ function renderFilteredGifts() {
     const selectedPerson = personFilter.value; 
     
     const filteredGifts = allGifts.filter(gift => {
-        // --- Shoda osoby (jednoduchá logika) ---
         const personMatch = (selectedPerson === 'all') || (gift.recipient === selectedPerson);
         if (!personMatch) return false;
 
-        // --- Shoda příležitosti (chytrá logika) ---
         if (selectedOccasion === 'all') return true;
 
         if (!gift.occasion || gift.occasion.trim() === '') {
@@ -381,14 +378,22 @@ function renderGift(gift, container) {
     }
     
     if (isAdmin) {
-        let adminResetBtn = '';
+        let adminResetReservationBtn = '';
+        let adminResetContributorsBtn = '';
+
         if (!isContributionGift && gift.status !== 'available') {
-             adminResetBtn = `<button data-id="${gift.id}" class="admin-reset-btn w-full px-3 py-1 bg-orange-600 text-white text-xs font-semibold rounded-md hover:bg-orange-700">Resetovat rezervaci</button>`;
+             adminResetReservationBtn = `<button data-id="${gift.id}" class="admin-reset-reservation-btn w-full px-3 py-1 bg-orange-600 text-white text-xs font-semibold rounded-md hover:bg-orange-700">Resetovat rezervaci</button>`;
         }
+        
+        if (isContributionGift && gift.contributors && gift.contributors.length > 0) {
+             adminResetContributorsBtn = `<button data-id="${gift.id}" class="admin-reset-contributors-btn w-full px-3 py-1 bg-orange-600 text-white text-xs font-semibold rounded-md hover:bg-orange-700">Resetovat přispěvatele</button>`;
+        }
+
          adminControls = `
             <div class="mt-3 pt-3 border-t border-slate-200 space-y-2">
                 <button data-id="${gift.id}" class="admin-edit-btn w-full px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-md hover:bg-blue-700">Upravit detaily</button>
-                ${adminResetBtn}
+                ${adminResetReservationBtn}
+                ${adminResetContributorsBtn}
                 <button data-id="${gift.id}" class="admin-delete-btn w-full px-3 py-1 bg-red-700 text-white text-xs font-semibold rounded-md hover:bg-red-800">Smazat dárek</button>
             </div>
          `;
@@ -465,7 +470,8 @@ function renderGift(gift, container) {
         listenForChatMessages(gift.id);
     }
     
-    const linkHTML = (gift.link && !isContributionGift) ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Odkaz na dárek</a>` : '';
+    // *** OPRAVENO: Zobrazí odkaz vždy, pokud existuje ***
+    const linkHTML = gift.link ? `<a href="${gift.link}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 px-3 py-1 bg-gray-100 text-gray-800 text-sm font-semibold rounded-md hover:bg-gray-200">Odkaz na dárek</a>` : '';
 
     const imageHTML = gift.imageUrl ? `
         <div class="mt-4">
@@ -872,10 +878,17 @@ if (giftsWrapper) {
             
             // --- Admin akce ---
             if (isAdmin) {
-                // Admin reset
-                if (clickedButton.matches('.admin-reset-btn')) {
+                // Admin reset rezervace
+                if (clickedButton.matches('.admin-reset-reservation-btn')) {
                     if (confirm('ADMIN: Opravdu chcete tuto rezervaci zrušit a vrátit dárek na "Dostupné"?')) {
                         await updateDoc(giftRef, { status: 'available', claimedBySolo: null, contributors: [], coordinator: null });
+                    }
+                }
+                
+                // Admin reset přispěvatelů
+                if (clickedButton.matches('.admin-reset-contributors-btn')) {
+                     if (confirm('ADMIN: Opravdu chcete smazat seznam přispěvatelů u tohoto dárku?')) {
+                        await updateDoc(giftRef, { contributors: [] });
                     }
                 }
                 
