@@ -22,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 // --- Inicializace App Check ---------------------------------------
 try {
     const appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider('TVUJ_RECAPTCHA_SITE_KEY'), // <-- VLOŽ KLÍČ SEM
+      provider: new ReCaptchaV3Provider('6LfDTQIsAAAAANXqps6CUrdaWyDH2_u72xvur-V8'), // <-- VLOŽ KLÍČ SEM
       isTokenAutoRefreshEnabled: true
     });
     console.log("Firebase App Check inicializován.");
