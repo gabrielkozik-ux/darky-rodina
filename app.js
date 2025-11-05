@@ -10,7 +10,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyC5qWRgRWW9q5G8NRmOpCln1Wwb03Z2eXs",
     authDomain: "darky-rodina.firebaseapp.com",
     projectId: "darky-rodina",
-    storageBucket: "darky-rodina.firebasestorage.app", 
+    storageBucket: "darky-rodina.firebasestorage.app",
     messagingSenderId: "1070152594421",
     appId: "1:1070152594421:web:5e686e340e756025d726bc"
 };
@@ -32,16 +32,59 @@ try {
 
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app); 
+const storage = getStorage(app);
 
-// --- Reference na HTML Elementy -------------------------------------------
+// --- ===== TATO ČÁST CHYBĚLA (Reference na HTML Elementy) ===== ---
 const loginBtn = document.getElementById('loginBtn');
-// ... (všechny ostatní reference zůstávají stejné) ...
+const logoutBtn = document.getElementById('logoutBtn');
+const userInfo = document.getElementById('user-info');
+const userNameEl = document.getElementById('user-name');
+const welcomeMsg = document.getElementById('welcome-msg');
+const pendingApprovalMsg = document.getElementById('pending-approval-msg');
+const loader = document.getElementById('loader');
+
+// Kontejnery dárků
+const giftsWrapper = document.getElementById('gifts-wrapper');
+const giftsHanickaSection = document.getElementById('gifts-hanicka-section');
+const giftsHanickaContainer = document.getElementById('gifts-hanicka-container');
+const giftsOliverSection = document.getElementById('gifts-oliver-section');
+const giftsOliverContainer = document.getElementById('gifts-oliver-container');
+const giftsOtherSection = document.getElementById('gifts-other-section');
+const giftsOtherContainer = document.getElementById('gifts-other-container');
+
+// Filtr
+const filterContainer = document.getElementById('filter-container');
+const occasionFilter = document.getElementById('occasion-filter');
+const personFilter = document.getElementById('person-filter'); 
+
+// Zprávy
+const filterNoResultsMsg = document.getElementById('filter-no-results-msg');
+const giftsEmptyDbMsg = document.getElementById('gifts-empty-db-msg');
+
+// Admin Panel
+const adminPanel = document.getElementById('admin-panel');
+const adminFormTitle = document.getElementById('admin-form-title');
+const addGiftForm = document.getElementById('add-gift-form');
+const addGiftLoader = document.getElementById('add-gift-loader');
+const addGiftSubmitBtn = document.getElementById('add-gift-submit');
+const cancelEditBtn = document.getElementById('cancel-edit-btn');
+const giftIsContributionCheckbox = document.getElementById('gift-is-contribution'); 
+const giftImageInput = document.getElementById('gift-image'); 
 const giftImagePreview = document.getElementById('gift-image-preview'); 
+
+// Modální okno
+const reservationModal = document.getElementById('reservation-modal');
+const modalTitle = document.getElementById('modal-title');
+const modalGiftName = document.getElementById('modal-gift-name');
+const modalOccasion = document.getElementById('modal-occasion');
+const modalCancelBtn = document.getElementById('modal-cancel-btn');
 const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+
+// Lightbox
 const imageLightbox = document.getElementById('image-lightbox');
 const lightboxImage = document.getElementById('lightbox-image');
 const lightboxClose = document.getElementById('lightbox-close');
+// --- ========================================================== ---
 
 
 // --- Globální proměnné ----------------------------------------------------
@@ -57,12 +100,17 @@ const occasionCategoryMap = {
     'Narozeniny': ['narozeniny', 'narodeniny'],
     'Svátek': ['svátek', 'svatek', 'meniny']
 };
-// *** UPRAVENO: Klíče z mapy, které mají být ve filtru ***
 const staticFilterOptions = ['all', ...Object.keys(occasionCategoryMap), 'Ostatní'];
 
 
 // --- Autentizace ---------------------------------------------------------
-// ... (celá sekce onAuthStateChanged zůstává stejná) ...
+loginBtn.addEventListener('click', () => {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider).catch(error => console.error("Chyba při přihlašování: ", error));
+});
+
+logoutBtn.addEventListener('click', () => signOut(auth));
+
 onAuthStateChanged(auth, user => {
     currentUser = user;
     if (user) {
@@ -98,7 +146,9 @@ onAuthStateChanged(auth, user => {
 
 // --- Logika Aplikace ----------------------------------------------------
 
-// ... (funkce resetAdminForm, linkify, checkUserRoleAndLoadGifts, listenForGifts zůstávají stejné) ...
+/**
+ * Funkce pro reset admin formuláře
+ */
 function resetAdminForm() {
     addGiftForm.reset();
     adminFormTitle.textContent = 'Panel administrátora';
@@ -112,6 +162,9 @@ function resetAdminForm() {
     giftImagePreview.src = '';
 }
 
+/**
+ * Funkce pro převod textu s URL na klikatelné odkazy
+ */
 function linkify(text) {
     if (!text) return '';
     const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
@@ -235,8 +288,7 @@ function populateOccasionFilter() {
 
 
 /**
- * *** UPRAVENO: Funkce pro chytré filtrování (oběma filtry) ***
- * Přidána logika pro "Ostatní".
+ * Funkce pro chytré filtrování (oběma filtry)
  */
 function renderFilteredGifts() {
     giftsHanickaContainer.innerHTML = '';
@@ -249,43 +301,35 @@ function renderFilteredGifts() {
     const filteredGifts = allGifts.filter(gift => {
         // --- Shoda osoby (jednoduchá logika) ---
         const personMatch = (selectedPerson === 'all') || (gift.recipient === selectedPerson);
-        if (!personMatch) return false; // Pokud nesedí osoba, rovnou přeskočit
+        if (!personMatch) return false;
 
         // --- Shoda příležitosti (chytrá logika) ---
-        
-        // Vždy zobrazit vše, pokud je vybráno "all"
         if (selectedOccasion === 'all') return true;
 
-        // Pokud dárek nemá příležitost, zobrazí se jen v "Ostatní"
         if (!gift.occasion || gift.occasion.trim() === '') {
             return selectedOccasion === 'Ostatní';
         }
 
         const giftOccasionLower = gift.occasion.toLowerCase();
 
-        // Logika pro "Ostatní"
         if (selectedOccasion === 'Ostatní') {
             let isMainCategory = false;
-            // Projdeme VŠECHNY hlavní kategorie
             for (const categoryKey in occasionCategoryMap) {
                 const mutations = occasionCategoryMap[categoryKey];
-                // Zjistíme, jestli dárek NEPATŘÍ do žádné z nich
                 if (mutations.some(prefix => giftOccasionLower.startsWith(prefix))) {
                     isMainCategory = true;
                     break;
                 }
             }
-            // Pokud nepatří do žádné hlavní, je to "Ostatní"
             return !isMainCategory;
         }
 
-        // Logika pro "Vánoce", "Narozeniny", "Svátek"
         const mutations = occasionCategoryMap[selectedOccasion];
         if (mutations) {
             return mutations.some(prefix => giftOccasionLower.startsWith(prefix));
         }
 
-        return false; // Pojistka
+        return false;
     });
 
     if (filteredGifts.length === 0) {
