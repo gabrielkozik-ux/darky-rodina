@@ -131,31 +131,37 @@ async function checkUserRoleAndLoadGifts(user) {
     adminPanel.classList.add('hidden');
     resetAdminForm();
 
-    const userRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userRef);
+    try {
+        const userRef = doc(db, 'users', user.uid);
+        const userDoc = await getDoc(userRef);
 
-    if (!userDoc.exists()) {
-        try {
-            await setDoc(userRef, { email: user.email, displayName: user.displayName, role: 'pending' });
-            pendingApprovalMsg.classList.remove('hidden');
-        } catch(e) { console.error(e); }
-        loader.classList.add('hidden');
-        return;
-    }
-
-    const userData = userDoc.data();
-    isAdmin = userData.role === 'admin';
-
-    if (userData.role === 'approved' || userData.role === 'admin') {
-        pendingApprovalMsg.classList.add('hidden');
-        if (isAdmin) {
-            adminPanel.classList.remove('hidden');
-            await loadUserMap();
+        if (!userDoc.exists()) {
+            try {
+                await setDoc(userRef, { email: user.email, displayName: user.displayName, role: 'pending' });
+                pendingApprovalMsg.classList.remove('hidden');
+            } catch(e) { console.error(e); }
+            loader.classList.add('hidden');
+            return;
         }
-        listenForGifts();
-    } else {
-        pendingApprovalMsg.classList.remove('hidden');
+
+        const userData = userDoc.data();
+        isAdmin = userData.role === 'admin';
+
+        if (userData.role === 'approved' || userData.role === 'admin') {
+            pendingApprovalMsg.classList.add('hidden');
+            if (isAdmin) {
+                adminPanel.classList.remove('hidden');
+                await loadUserMap();
+            }
+            listenForGifts();
+        } else {
+            pendingApprovalMsg.classList.remove('hidden');
+            loader.classList.add('hidden');
+        }
+    } catch(err) {
+        console.error('checkUserRoleAndLoadGifts error:', err);
         loader.classList.add('hidden');
+        giftsGrid.innerHTML = '<p style="color:var(--c-red);text-align:center;padding:16px;">Chyba při načítání (viz F12 konzole).</p>';
     }
 }
 
@@ -175,7 +181,7 @@ function resetAdminForm() {
 
 // --- Gifts listener ---
 function listenForGifts() {
-    const q = query(collection(db, 'gifts'), orderBy('recipient'), orderBy('name'));
+    const q = query(collection(db, 'gifts'), orderBy('name'));
     onSnapshot(q, snap => {
         loader.classList.add('hidden');
         allGifts = [];
